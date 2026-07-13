@@ -1485,10 +1485,11 @@ function renderList(body, q){
     const vencido = tieneDeuda && diasDesdeEnvio(a) >= recordatorioFrecuenciaDias;
     const bellHtml = vencido ? '<span title="Toca recordar" style="margin-left:5px;">🔔</span>' : '';
     const envioHtml = a.ultimo_envio ? '<div class="meta">Último WhatsApp: hace '+Math.floor(diasDesdeEnvio(a))+' día(s)</div>' : '';
+const alquiladoHtml = a.alquilado ? '<div class="meta" style="color:var(--amber);">🏠 Alquilado'+(a.inquilino_nombre?' · Inquilino: '+esc(a.inquilino_nombre):'')+'</div>' : '';
     card.innerHTML = '<div class="idrow"><span class="idlabel">'+dIcon+a.id+bellHtml+'</span>'+
       '<span class="badge '+estadoBadgeClass(a.estado)+'">'+estadoLabel(a.estado)+'</span></div>'+
       '<div class="owner">'+(a.propietario||'Sin propietario asignado')+'</div>'+
-      '<div class="meta">'+(a.total_m2||'-')+' m² · Cuota mensual $'+(a.cuota_mensual!=null?a.cuota_mensual:'-')+'</div>'+deudaHtml+projDebtHtml+envioHtml;
+      '<div class="meta">'+(a.total_m2||'-')+' m² · Cuota mensual $'+(a.cuota_mensual!=null?a.cuota_mensual:'-')+'</div>'+deudaHtml+projDebtHtml+alquiladoHtml+envioHtml;
     card.onclick = ()=>{ selected={type:'apt', ref:a}; currentTab='editar'; renderSidebar(); buildScene(); };
 
     const btnRow = document.createElement('div');
@@ -1561,7 +1562,14 @@ function renderEditApt(body, apt){
         <option value="Vendido sin firmar" ${apt.estado==='Vendido sin firmar'?'selected':''}>Vendido sin firmar</option>
       </select>
     </div>
-    <h3 class="section">Superficies</h3>
+<h3 class="section">Segundo contacto</h3>
+<div class="form-row"><label>Nombre</label><input id="f_contacto2_nombre" value="${esc(apt.contacto2_nombre)}"></div>
+<div class="form-row"><label>Teléfono (WhatsApp)</label><input id="f_contacto2_telefono" value="${esc(apt.contacto2_telefono)}" placeholder="Ej: 584121234567"></div>
+<h3 class="section">Alquiler</h3>
+<div class="form-row"><label><input type="checkbox" id="f_alquilado" ${apt.alquilado?'checked':''} style="width:auto;margin-right:6px;vertical-align:middle;">Apartamento alquilado</label></div>
+<div class="form-row"><label>Nombre del inquilino</label><input id="f_inquilino_nombre" value="${esc(apt.inquilino_nombre)}"></div>
+<div class="form-row"><label>Teléfono del inquilino</label><input id="f_inquilino_telefono" value="${esc(apt.inquilino_telefono)}" placeholder="Ej: 584121234567"></div>
+<h3 class="section">Superficies</h3>
     <div class="form-row two">
       <div><label>Construcción (m²)</label><input id="f_constr" type="number" step="0.01" value="${apt.construccion!=null?apt.construccion:''}"></div>
       <div><label>Terraza (m²)</label><input id="f_terraza" type="number" step="0.01" value="${apt.terraza!=null?apt.terraza:''}"></div>
@@ -1596,6 +1604,11 @@ function renderEditApt(body, apt){
     apt.propietario = document.getElementById('f_propietario').value;
     apt.telefono = document.getElementById('f_telefono').value.trim() || null;
     apt.estado = document.getElementById('f_estado').value || null;
+    apt.contacto2_nombre = document.getElementById('f_contacto2_nombre').value.trim() || null;
+    apt.contacto2_telefono = document.getElementById('f_contacto2_telefono').value.trim() || null;
+    apt.alquilado = document.getElementById('f_alquilado').checked;
+    apt.inquilino_nombre = document.getElementById('f_inquilino_nombre').value.trim() || null;
+    apt.inquilino_telefono = document.getElementById('f_inquilino_telefono').value.trim() || null;
     apt.construccion = parseFloat(document.getElementById('f_constr').value) || null;
     apt.terraza = parseFloat(document.getElementById('f_terraza').value) || null;
     apt.total_m2 = parseFloat(document.getElementById('f_totalm2').value) || null;
