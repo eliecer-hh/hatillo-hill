@@ -1,0 +1,2482 @@
+<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hatillo Hill 3D</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root{
+    --bg:#0f1720; --panel:#161f2b; --panel2:#1c2735; --border:#2a3646;
+    --text:#e7edf5; --sub:#94a3b8; --accent:#3b82f6;
+    --green:#10b981; --amber:#f59e0b; --red:#ef4444; --gray:#64748b; --brown:#a16207;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;overflow:hidden;}
+  #app{display:flex;height:100vh;width:100vw;}
+  #viewport{flex:1;position:relative;min-width:0;}
+  #canvasHost{width:100%;height:100%;display:block;cursor:grab;touch-action:none;}
+  #canvasHost.dragging{cursor:grabbing;}
+
+  #topbar{position:absolute;top:0;left:0;right:0;padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+    background:linear-gradient(to bottom, rgba(15,23,32,0.92), rgba(15,23,32,0));pointer-events:none;z-index:5;}
+  #topbar > *{pointer-events:auto;}
+  .brand{font-weight:700;font-size:15px;letter-spacing:.3px;margin-right:8px;white-space:nowrap;display:flex;align-items:center;gap:8px;}
+  .brandLogo{height:28px;width:auto;}
+  .brand span{color:var(--accent);}
+  .chipbar{display:flex;gap:6px;flex-wrap:wrap;background:rgba(22,31,43,0.85);border:1px solid var(--border);padding:4px;border-radius:10px;backdrop-filter:blur(6px);}
+  .chip{background:transparent;border:none;color:var(--sub);padding:6px 10px;border-radius:7px;font-size:12.5px;cursor:pointer;font-weight:600;white-space:nowrap;transition:.15s;}
+  .chip:hover{color:var(--text);background:var(--panel2);}
+  .chip.active{background:var(--accent);color:white;}
+  .deudachip.active{background:#ef4444;color:white;}
+
+  #legend{position:absolute;bottom:12px;left:12px;background:rgba(22,31,43,0.9);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:11.5px;color:var(--sub);z-index:5;backdrop-filter:blur(6px);}
+  #legend .row{display:flex;align-items:center;gap:6px;margin:3px 0;}
+  #legend .sw{width:10px;height:10px;border-radius:3px;display:inline-block;}
+
+  #hint{position:absolute;bottom:12px;right:12px;background:rgba(22,31,43,0.85);border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-size:11px;color:var(--sub);z-index:5;max-width:220px;}
+
+  #tooltip{position:absolute;pointer-events:none;background:rgba(10,15,22,0.95);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--text);z-index:20;display:none;white-space:nowrap;}
+  #tooltip b{color:var(--accent);}
+
+  #sidebar{width:340px;min-width:340px;background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+  #sidebarTabs{display:flex;border-bottom:1px solid var(--border);}
+  .stab{flex:1;text-align:center;padding:12px 6px;font-size:12.5px;font-weight:700;color:var(--sub);cursor:pointer;border-bottom:2px solid transparent;}
+  .stab.active{color:var(--text);border-bottom-color:var(--accent);}
+  #sidebarBody{flex:1;overflow-y:auto;padding:14px;}
+  #sidebarBody::-webkit-scrollbar{width:8px;}
+  #sidebarBody::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+
+  .empty{color:var(--sub);font-size:13px;line-height:1.6;padding:20px 4px;text-align:center;}
+  .empty .big{font-size:32px;margin-bottom:8px;}
+
+  .card{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;cursor:pointer;transition:.12s;}
+  .card:hover{border-color:var(--accent);}
+  .card .idrow{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+  .card .idlabel{font-weight:700;font-size:13.5px;}
+  .dIcon{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#ef4444;color:#fff;font-size:10px;font-weight:800;margin-right:5px;}
+  .card .badge{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;}
+  .card .owner{font-size:12px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .card .meta{font-size:11px;color:var(--sub);margin-top:4px;}
+
+  .badge.entregado{background:rgba(16,185,129,.18);color:var(--green);}
+  .badge.sinentregar{background:rgba(245,158,11,.18);color:var(--amber);}
+  .badge.sinfirmar{background:rgba(239,68,68,.18);color:var(--red);}
+
+  .searchbox{width:100%;padding:9px 11px;border-radius:8px;border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:13px;margin-bottom:12px;}
+  .searchbox:focus{outline:none;border-color:var(--accent);}
+
+  h3.section{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--sub);margin:0 0 8px 0;font-weight:700;}
+
+  .form-row{margin-bottom:11px;}
+  .form-row label{display:block;font-size:11px;color:var(--sub);margin-bottom:4px;font-weight:600;}
+  .form-row input, .form-row select{width:100%;padding:8px 10px;border-radius:7px;border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:13px;}
+  .form-row input:focus, .form-row select:focus{outline:none;border-color:var(--accent);}
+  .form-row.two{display:flex;gap:8px;}
+  .form-row.two > div{flex:1;}
+  .form-row input[readonly]{color:var(--sub);background:#141c27;}
+
+  .detail-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .detail-head .big-id{font-size:19px;font-weight:800;}
+  .backbtn{background:var(--panel2);border:1px solid var(--border);color:var(--sub);border-radius:7px;padding:6px 10px;font-size:12px;cursor:pointer;}
+  .backbtn:hover{color:var(--text);}
+
+  .comp-list{display:flex;flex-direction:column;gap:6px;margin-top:6px;}
+  .comp-item{display:flex;justify-content:space-between;background:var(--panel2);border:1px solid var(--border);border-radius:7px;padding:7px 9px;font-size:12px;}
+  .comp-item .t{color:var(--sub);}
+
+  .savebar{position:sticky;bottom:0;background:var(--panel);padding-top:10px;margin-top:6px;border-top:1px solid var(--border);display:flex;gap:8px;}
+  .btn{flex:1;padding:10px;border-radius:8px;border:none;font-weight:700;font-size:12.5px;cursor:pointer;}
+  .btn.primary{background:var(--accent);color:white;}
+  .btn.primary:hover{background:#2f6fe0;}
+  .btn.ghost{background:var(--panel2);color:var(--sub);border:1px solid var(--border);}
+  .btn.ghost:hover{color:var(--text);}
+  .savedFlag{font-size:11px;color:var(--green);text-align:center;margin-top:6px;min-height:14px;}
+
+  .statline{display:flex;justify-content:space-between;font-size:12px;color:var(--sub);padding:4px 0;border-bottom:1px dashed var(--border);}
+  .statline b{color:var(--text);}
+
+  .footer-actions{padding:12px 14px;border-top:1px solid var(--border);display:flex;gap:8px;}
+
+  .assumption{font-size:10.5px;color:var(--sub);background:var(--panel2);border:1px dashed var(--border);border-radius:7px;padding:7px 9px;margin-bottom:10px;line-height:1.5;}
+
+  #dashboardModal{position:fixed;inset:0;background:rgba(6,10,15,0.72);backdrop-filter:blur(3px);z-index:100;display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 16px;}
+  #dashboardModal.open{display:flex;}
+  .dashCard{background:var(--panel);border:1px solid var(--border);border-radius:14px;width:100%;max-width:980px;padding:20px 22px 26px;}
+  .dashHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+  .dashHead h2{margin:0;font-size:18px;}
+  .dashGrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  @media (max-width:760px){ .dashGrid{grid-template-columns:1fr;} .dashCard{padding:16px;} }
+  .dashWidget{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:14px;}
+  .dashWidget h3{margin:0 0 10px 0;font-size:12.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--sub);}
+  .dashRow{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;padding:5px 0;border-bottom:1px dashed var(--border);gap:8px;}
+  .dashRow:last-child{border-bottom:none;}
+  .dashRank{color:var(--sub);font-weight:700;width:18px;flex:0 0 18px;}
+  .dashId{font-weight:700;flex:0 0 auto;}
+  .dashOwner{color:var(--sub);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .dashVal{font-weight:700;flex:0 0 auto;white-space:nowrap;}
+  .dashBarWrap{background:var(--border);border-radius:5px;height:7px;overflow:hidden;margin-top:4px;}
+  .dashBar{height:100%;border-radius:5px;}
+  .dashEmpty{color:var(--sub);font-size:12px;text-align:center;padding:10px 0;}
+
+  @media (max-width: 820px){
+    #topbar{flex-direction:column; align-items:stretch; padding:8px; gap:6px;}
+    .brand{display:none;}
+    .chipbar{flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; width:100%; scrollbar-width:none;}
+    .chipbar::-webkit-scrollbar{display:none;}
+    .chip{flex:0 0 auto;}
+    #sidebar{position:absolute;right:0;top:0;bottom:0;width:88vw;min-width:0;z-index:30;transform:translateX(0);transition:.2s;box-shadow:-8px 0 24px rgba(0,0,0,.4);}
+    #sidebar.hidden{transform:translateX(100%);}
+    #mobileToggle{position:absolute;top:10px;right:10px;z-index:31;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:12px;font-weight:700;}
+    #legend{max-width:120px;padding:7px 8px;font-size:9.5px;bottom:8px;left:8px;}
+    #legend .row{margin:2px 0;}
+    #legend .sw{width:8px;height:8px;}
+    #hint{display:none;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="viewport">
+    <canvas id="canvasHost" width="1495" height="868" style="cursor: grab;"></canvas>
+    <div id="topbar">
+      <div class="brand"><img class="brandLogo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAfQAAAH0CAYAAADL1t+KAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAEmWlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSfvu78nIGlkPSdXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQnPz4KPHg6eG1wbWV0YSB4bWxuczp4PSdhZG9iZTpuczptZXRhLyc+CjxyZGY6UkRGIHhtbG5zOnJkZj0naHR0cDovL3d3dy53My5vcmcvMTk5OS8wMi8yMi1yZGYtc3ludGF4LW5zIyc+CgogPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9JycKICB4bWxuczpBdHRyaWI9J2h0dHA6Ly9ucy5hdHRyaWJ1dGlvbi5jb20vYWRzLzEuMC8nPgogIDxBdHRyaWI6QWRzPgogICA8cmRmOlNlcT4KICAgIDxyZGY6bGkgcmRmOnBhcnNlVHlwZT0nUmVzb3VyY2UnPgogICAgIDxBdHRyaWI6Q3JlYXRlZD4yMDI0LTExLTI4PC9BdHRyaWI6Q3JlYXRlZD4KICAgICA8QXR0cmliOkV4dElkPmVjMTMwZTdhLWZjNjItNDYwNy1hYjE4LWFmOGJkYTZiNDdiNjwvQXR0cmliOkV4dElkPgogICAgIDxBdHRyaWI6RmJJZD41MjUyNjU5MTQxNzk1ODA8L0F0dHJpYjpGYklkPgogICAgIDxBdHRyaWI6VG91Y2hUeXBlPjI8L0F0dHJpYjpUb3VjaFR5cGU+CiAgICA8L3JkZjpsaT4KICAgPC9yZGY6U2VxPgogIDwvQXR0cmliOkFkcz4KIDwvcmRmOkRlc2NyaXB0aW9uPgoKIDxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PScnCiAgeG1sbnM6ZGM9J2h0dHA6Ly9wdXJsLm9yZy9kYy9lbGVtZW50cy8xLjEvJz4KICA8ZGM6dGl0bGU+CiAgIDxyZGY6QWx0PgogICAgPHJkZjpsaSB4bWw6bGFuZz0neC1kZWZhdWx0Jz5IQVRJTExPIEhJTEwgLSAzPC9yZGY6bGk+CiAgIDwvcmRmOkFsdD4KICA8L2RjOnRpdGxlPgogPC9yZGY6RGVzY3JpcHRpb24+CgogPHJkZjpEZXNjcmlwdGlvbiBy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" alt="Hatillo Hill">HATILLO HILL <span>3D</span></div>
+      <div class="chipbar" id="pisoBar"><button class="chip active">Todos</button><button class="chip">Piso PB</button><button class="chip">Piso 1</button><button class="chip">Piso 2</button><button class="chip">Piso 3</button><button class="chip">Piso PH</button></div>
+      <div class="chipbar" id="sotanoBar"><button class="chip">Sótano 1</button><button class="chip">Sótano 2</button><button class="chip">Sótano 3</button></div>
+      <div class="chipbar" id="torreBar"><button class="chip">Torre A</button><button class="chip">Torre B</button></div>
+      <div class="chipbar" id="deudaBar"><button class="chip deudachip active">Todos</button><button class="chip deudachip">Con deuda</button><button class="chip deudachip">Sin deuda</button></div>
+      <div class="chipbar"><button class="chip" id="btnOpenDashboard" style="background:var(--accent);color:#fff;">📊 Dashboard</button></div>
+      <div class="chipbar" id="driveBar"><button class="chip" id="btnDriveConnect" style="background:#3b82f6;color:#fff;">☁️ Conectar Google Drive</button></div>
+    </div>
+    <div id="legend">
+      <div class="row"><span class="sw" style="background:#3b82f6"></span> Piso PB</div>
+      <div class="row"><span class="sw" style="background:#10b981"></span> Piso 1</div>
+      <div class="row"><span class="sw" style="background:#e5e7eb"></span> Piso 2</div>
+      <div class="row"><span class="sw" style="background:#f97316"></span> Piso 3</div>
+      <div class="row"><span class="sw" style="background:#9ca3af"></span> Piso PH</div>
+      <div class="row"><span class="sw" style="background:#64748b"></span> Puesto estac.</div>
+      <div class="row"><span class="sw" style="background:#a16207"></span> Maletero</div>
+      <div class="row"><span class="sw" style="background:#ef4444"></span> Seleccionado</div>
+    </div>
+    <div id="hint">Arrastra para rotar · rueda para zoom · clic en un elemento para editarlo</div>
+    <div id="tooltip" style="display: none; left: 814px; top: 491.4px;"><b>Puesto #7</b> · Estacionamiento</div>
+    <button id="mobileToggle" style="display:none;">☰ Lista</button>
+    <div id="dashboardModal">
+      <div class="dashCard">
+        <div class="dashHead">
+          <h2>📊 Dashboard</h2>
+          <div style="display:flex;gap:8px;">
+            <button class="btn primary" id="btnShareDashboardImg" style="padding:8px 12px;">🖼️ Compartir imagen (sin nombres)</button>
+            <button class="backbtn" id="btnCloseDashboard">✕ Cerrar</button>
+          </div>
+        </div>
+        <div class="dashGrid" id="dashboardBody"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="sidebar">
+    <div id="sidebarTabs">
+      <div class="stab active" data-tab="lista">Lista</div>
+      <div class="stab" data-tab="editar">Editar</div>
+      <div class="stab" data-tab="proyectos">Proyectos</div>
+      <div class="stab" data-tab="resumen">Resumen</div>
+      <div class="stab" data-tab="deuda" style="color:var(--sub);font-size:11px;">Importar Recibos</div>
+    </div>
+    <div id="sidebarBody"><div>
+    <h3 class="section">Adjuntar archivo de deuda</h3>
+    <div class="assumption">Columnas esperadas: ID apto, Propietario, Meses, Monto. Acepta .xlsx, .xls o .csv. También puedes copiar la tabla "Recibos Pendientes" de tu portal Habitacom (Unidad, Propietario, Recibos, Deuda) y pegarla abajo tal cual — se reconoce el mismo orden de columnas y el formato de monto en español (ej. 1.679,35). Se busca coincidencia por ID de apartamento.</div>
+    <input type="file" id="deudaFile" accept=".xlsx,.xls,.csv" style="width:100%;padding:8px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;">
+    <div class="savedFlag" id="savedFlagDeuda"></div>
+    <details style="margin-top:10px;">
+      <summary style="cursor:pointer;font-size:12px;color:var(--sub);">O pegar manualmente</summary>
+      <textarea id="deudaPaste" placeholder="Pega aquí desde Excel..." style="width:100%;min-height:90px;margin-top:8px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:9px;font-size:12px;font-family:monospace;"></textarea>
+      <button class="btn primary" id="btnProcesar" style="margin-top:8px;width:100%;">Procesar texto pegado</button>
+    </details>
+    <div class="savebar" style="margin-top:10px;">
+      <button class="btn ghost" id="btnLimpiarDeuda">Limpiar tabla</button>
+    </div>
+    <h3 class="section" style="margin-top:16px;">Tabla actual (0)</h3>
+    <div id="deudaTableHost"><div class="comp-list"></div></div>
+  </div></div>
+    <div class="footer-actions">
+      <button class="btn primary" id="btnExportSnapshot" style="flex:1;">Exportar para compartir</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const RAW_DATA = {"condominio":"HATILLO HILL","presupuesto_estimado_anual":57605,"apartamentos":[],"estacionamientos_sotano":[],"maleteros_sotano":[],"deuda":[],"proyectos_especiales":[]};
+
+// ---------- state ----------
+let apartments = JSON.parse(JSON.stringify(RAW_DATA.apartamentos));
+let parking = JSON.parse(JSON.stringify(RAW_DATA.estacionamientos_sotano));
+let maleteros = JSON.parse(JSON.stringify(RAW_DATA.maleteros_sotano));
+let deudaRows = JSON.parse(JSON.stringify(RAW_DATA.deuda||[]));
+let deudaHistorial = []; // snapshots {fecha, total, apartamentos:[{id,monto}]} cada vez que se actualiza la tabla de deuda
+let proyectos = JSON.parse(JSON.stringify(RAW_DATA.proyectos_especiales||[]));
+let whatsappTemplateGeneral = 'Hola {nombre}, le saluda la Junta de Condominio de Hatillo Hill. Cualquier consulta sobre el apartamento {id}, quedamos atentos.';
+let whatsappTemplateCobro = 'Hola {nombre}, le recordamos que el apartamento {id} en Hatillo Hill presenta una deuda de ${monto} correspondiente a {meses} mes(es) ({dias} días aprox.). Agradecemos su pago a la brevedad. -- Junta de Condominio';
+let recordatorioFrecuenciaDias = 15;
+let preferWhatsappEscritorio = false;
+
+function normalizeId(s){
+  return String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+}
+function findDeuda(apt){
+  const n = normalizeId(apt.id);
+  return deudaRows.find(r=>normalizeId(r.id)===n) || null;
+}
+
+let filterPiso = 'ALL';
+let filterTorre = 'ALL';
+let filterSotano = null; // '1' | '2' | '3' | null
+let filterDeuda = null; // 'con' | 'sin' | null
+let selected = null; // {type:'apt'|'park'|'malet', ref}
+let currentTab = 'lista';
+let selectedProyectoId = null;
+
+const PISOS = ['PB','1','2','3','PH'];
+const SOTANOS = ['1','2','3'];
+const HILITE_COLOR = 0xff0000; // rojo intenso
+
+function extractDigits(str){
+  const m = String(str).match(/\d+/g);
+  if(!m) return null;
+  return parseInt(m[m.length-1],10);
+}
+const STORAGE_PREFIX = 'apt_override:';
+const PARK_PREFIX = 'park_override:';
+const MALET_PREFIX = 'malet_override:';
+
+// ---------- Google Drive sync ----------
+// Reemplaza el window.storage propio de los artefactos de Claude (no existe fuera de ese
+// entorno) por un almacén clave-valor real: siempre guarda de inmediato en localStorage
+// (funciona sin conexión) y, si hay sesión de Drive activa, sincroniza el archivo completo
+// hatillo_hill_data.json en la cuenta de Google Drive del presidente.
+const DRIVE_CLIENT_ID = '569945768221-55ovbt6pdg0mqs263t4vfvolotdpgrfq.apps.googleusercontent.com';
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive';
+const DRIVE_FILE_NAME = 'hatillo_hill_data.json';
+const LOCAL_KV_KEY = 'hatillo_hill_kv_v1';
+const FULL_SNAPSHOT_KEY = 'full_snapshot';
+
+let driveTokenClient = null;
+let driveAccessToken = null;
+let driveFileId = null;
+let driveConnected = false;
+let drivePushTimer = null;
+
+function loadLocalKV(){
+  try{ return JSON.parse(localStorage.getItem(LOCAL_KV_KEY)) || {}; }catch(e){ return {}; }
+}
+function saveLocalKV(){
+  try{ localStorage.setItem(LOCAL_KV_KEY, JSON.stringify(kvStore)); }catch(e){}
+}
+let kvStore = loadLocalKV();
+
+const DriveKV = {
+  async get(key){ return kvStore[key]!=null ? {value: kvStore[key]} : null; },
+  async set(key, value){
+    kvStore[key] = value;
+    kvStore._updated_at = new Date().toISOString();
+    saveLocalKV();
+    scheduleDrivePush();
+  },
+  async delete(key){
+    delete kvStore[key];
+    kvStore._updated_at = new Date().toISOString();
+    saveLocalKV();
+    scheduleDrivePush();
+  },
+  async list(prefix){ return {keys: Object.keys(kvStore).filter(k=>k.startsWith(prefix))}; }
+};
+window.storage = DriveKV;
+
+function setDriveStatus(state, text){
+  const btn = document.getElementById('btnDriveConnect');
+  if(!btn) return;
+  btn.title = text || '';
+  const colors = {disconnected:'#3b82f6', connected:'#10b981', syncing:'#f59e0b', error:'#ef4444'};
+  const labels = {
+    disconnected: '☁️ Conectar Google Drive',
+    connected: '☁️ Sincronizado con Drive',
+    syncing: '☁️ Guardando en Drive...',
+    error: '☁️ Error de Drive (toca para reintentar)'
+  };
+  btn.style.background = colors[state] || colors.disconnected;
+  btn.textContent = labels[state] || labels.disconnected;
+}
+
+async function driveFindOrCreateFile(){
+  const q = encodeURIComponent("name='"+DRIVE_FILE_NAME+"' and trashed=false");
+  const res = await fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&spaces=drive&fields=files(id,name)', {
+    headers:{Authorization:'Bearer '+driveAccessToken}
+  });
+  const data = await res.json();
+  if(data.files && data.files.length) return data.files[0].id;
+  const metadata = {name: DRIVE_FILE_NAME, mimeType:'application/json'};
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify(metadata)], {type:'application/json'}));
+  form.append('file', new Blob([JSON.stringify(kvStore)], {type:'application/json'}));
+  const createRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+    method:'POST', headers:{Authorization:'Bearer '+driveAccessToken}, body: form
+  });
+  const created = await createRes.json();
+  return created.id;
+}
+
+async function drivePushNow(){
+  if(!driveConnected || !driveFileId) return;
+  try{
+    setDriveStatus('syncing','Guardando en Drive...');
+    await fetch('https://www.googleapis.com/upload/drive/v3/files/'+driveFileId+'?uploadType=media', {
+      method:'PATCH',
+      headers:{Authorization:'Bearer '+driveAccessToken, 'Content-Type':'application/json'},
+      body: JSON.stringify(kvStore)
+    });
+    setDriveStatus('connected','Sincronizado con Drive');
+  }catch(e){
+    console.error(e);
+    setDriveStatus('error','No se pudo guardar en Drive (los cambios quedaron guardados en este navegador)');
+  }
+}
+function scheduleDrivePush(){
+  if(!driveConnected) return;
+  clearTimeout(drivePushTimer);
+  drivePushTimer = setTimeout(drivePushNow, 1200);
+}
+
+async function driveSyncPull(){
+  try{
+    setDriveStatus('syncing','Sincronizando...');
+    driveFileId = await driveFindOrCreateFile();
+    const res = await fetch('https://www.googleapis.com/drive/v3/files/'+driveFileId+'?alt=media', {
+      headers:{Authorization:'Bearer '+driveAccessToken}
+    });
+    const remote = await res.json().catch(()=>({}));
+    const remoteTime = remote._updated_at ? new Date(remote._updated_at).getTime() : 0;
+    const localTime = kvStore._updated_at ? new Date(kvStore._updated_at).getTime() : 0;
+    if(remoteTime > localTime){
+      kvStore = remote;
+      saveLocalKV();
+    } else if(localTime > remoteTime){
+      await drivePushNow();
+    }
+    await loadOverrides();
+    if(typeof rebuildScene==='function') rebuildScene();
+    renderSidebar();
+    setDriveStatus('connected','Sincronizado con Drive');
+  }catch(e){
+    console.error(e);
+    setDriveStatus('error','No se pudo sincronizar con Drive (revisa tu conexión)');
+  }
+}
+
+async function restoreDriveSession(){
+  const tok = sessionStorage.getItem('drive_token');
+  const exp = parseInt(sessionStorage.getItem('drive_token_exp')||'0', 10);
+  if(tok && Date.now() < exp){
+    driveAccessToken = tok;
+    driveConnected = true;
+    driveSyncPull();
+  } else {
+    setDriveStatus('disconnected','No conectado a Google Drive: los cambios solo se guardan en este navegador');
+  }
+}
+
+function waitForGIS(cb, tries){
+  tries = tries || 0;
+  if(window.google && google.accounts && google.accounts.oauth2){ cb(); return; }
+  if(tries > 40){ console.warn('Google Identity Services no cargó'); return; }
+  setTimeout(()=>waitForGIS(cb, tries+1), 150);
+}
+waitForGIS(function(){
+  driveTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: DRIVE_CLIENT_ID,
+    scope: DRIVE_SCOPE,
+    callback: async (resp)=>{
+      if(resp.error){ setDriveStatus('error','No se pudo conectar: '+resp.error); return; }
+      driveAccessToken = resp.access_token;
+      driveConnected = true;
+      sessionStorage.setItem('drive_token', driveAccessToken);
+      sessionStorage.setItem('drive_token_exp', String(Date.now() + (resp.expires_in*1000 - 60000)));
+      await driveSyncPull();
+    }
+  });
+  const btn = document.getElementById('btnDriveConnect');
+  if(btn) btn.addEventListener('click', ()=>{ driveTokenClient.requestAccessToken(); });
+});
+
+// ---------- persistence ----------
+// El archivo publicado en GitHub Pages no trae datos reales de residentes (privacidad):
+// arranca con arreglos vacíos y, si existe un "full_snapshot" en Drive/localStorage
+// (guardado por saveFullSnapshot en cada edición), lo usa como fuente completa de datos,
+// reemplazando por entero apartments/parking/maleteros/deudaRows/proyectos.
+async function saveFullSnapshot(){
+  const snap = {
+    apartments, parking, maleteros, deudaRows, deudaHistorial, proyectos,
+    whatsappTemplateGeneral, whatsappTemplateCobro,
+    recordatorioFrecuenciaDias, preferWhatsappEscritorio
+  };
+  try{ await window.storage.set(FULL_SNAPSHOT_KEY, JSON.stringify(snap)); }catch(e){ console.error(e); }
+}
+
+async function loadOverrides(){
+  try{
+    const snap = await window.storage.get(FULL_SNAPSHOT_KEY);
+    if(snap && snap.value){
+      const p = JSON.parse(snap.value);
+      if(p.apartments) apartments = p.apartments;
+      if(p.parking) parking = p.parking;
+      if(p.maleteros) maleteros = p.maleteros;
+      if(p.deudaRows) deudaRows = p.deudaRows;
+      if(p.deudaHistorial) deudaHistorial = p.deudaHistorial;
+      if(p.proyectos) proyectos = p.proyectos;
+      if(p.whatsappTemplateGeneral) whatsappTemplateGeneral = p.whatsappTemplateGeneral;
+      if(p.whatsappTemplateCobro) whatsappTemplateCobro = p.whatsappTemplateCobro;
+      if(p.recordatorioFrecuenciaDias) recordatorioFrecuenciaDias = p.recordatorioFrecuenciaDias;
+      if(p.preferWhatsappEscritorio!=null) preferWhatsappEscritorio = p.preferWhatsappEscritorio;
+      return;
+    }
+  }catch(e){}
+  try{
+    const r = await window.storage.get('deuda_table');
+    if(r && r.value) deudaRows = JSON.parse(r.value);
+  }catch(e){}
+  try{
+    const r = await window.storage.get('deuda_historial');
+    if(r && r.value) deudaHistorial = JSON.parse(r.value);
+  }catch(e){}
+  try{
+    const r = await window.storage.get('proyectos_especiales');
+    if(r && r.value) proyectos = JSON.parse(r.value);
+  }catch(e){}
+  try{
+    const r = await window.storage.get('whatsapp_template_general');
+    if(r && r.value) whatsappTemplateGeneral = r.value;
+  }catch(e){}
+  try{
+    const r = await window.storage.get('whatsapp_template_cobro');
+    if(r && r.value) whatsappTemplateCobro = r.value;
+  }catch(e){}
+  try{
+    const r = await window.storage.get('recordatorio_frecuencia_dias');
+    if(r && r.value) recordatorioFrecuenciaDias = parseInt(r.value,10) || 15;
+  }catch(e){}
+  try{
+    const r = await window.storage.get('prefer_whatsapp_escritorio');
+    if(r && r.value) preferWhatsappEscritorio = r.value==='1';
+  }catch(e){}
+  try{
+    const list = await window.storage.list('apt_override:');
+    if(list && list.keys){
+      for(const k of list.keys){
+        try{
+          const r = await window.storage.get(k);
+          if(r && r.value){
+            const ov = JSON.parse(r.value);
+            const apt = apartments.find(a=>a.id===ov.id);
+            if(apt) Object.assign(apt, ov);
+          }
+        }catch(e){}
+      }
+    }
+  }catch(e){}
+  try{
+    const list = await window.storage.list('park_override:');
+    if(list && list.keys){
+      for(const k of list.keys){
+        try{
+          const r = await window.storage.get(k);
+          if(r && r.value){
+            const ov = JSON.parse(r.value);
+            const p = parking.find(x=>String(x.numero)===String(ov.numero));
+            if(p) Object.assign(p, ov);
+          }
+        }catch(e){}
+      }
+    }
+  }catch(e){}
+  try{
+    const list = await window.storage.list('malet_override:');
+    if(list && list.keys){
+      for(const k of list.keys){
+        try{
+          const r = await window.storage.get(k);
+          if(r && r.value){
+            const ov = JSON.parse(r.value);
+            const m = maleteros.find(x=>String(x.numero)===String(ov.numero));
+            if(m) Object.assign(m, ov);
+          }
+        }catch(e){}
+      }
+    }
+  }catch(e){}
+}
+
+async function saveApt(apt){
+  try{ await window.storage.set(STORAGE_PREFIX+apt.id, JSON.stringify(apt)); }catch(e){ console.error(e); }
+  saveFullSnapshot();
+}
+async function savePark(p){
+  try{ await window.storage.set(PARK_PREFIX+p.numero, JSON.stringify(p)); }catch(e){ console.error(e); }
+  saveFullSnapshot();
+}
+async function saveMalet(m){
+  try{ await window.storage.set(MALET_PREFIX+m.numero, JSON.stringify(m)); }catch(e){ console.error(e); }
+  saveFullSnapshot();
+}
+async function saveProyectos(){
+  try{ await window.storage.set('proyectos_especiales', JSON.stringify(proyectos)); }catch(e){ console.error(e); }
+  saveFullSnapshot();
+}
+async function saveWhatsappTemplateGeneral(t){
+  whatsappTemplateGeneral = t;
+  try{ await window.storage.set('whatsapp_template_general', t); }catch(e){ console.error(e); }
+  saveFullSnapshot();
+}
+async function saveWhatsappTemplateCobro(t){
+  whatsappTemplateCobro = t;
+  try{ await window.storage.set('whatsapp_template_cobro', t); }catch(e){ console.error(e); }
+  saveFullSnapshot();
+}
+async function saveRecordatorioFrecuencia(dias){
+  recordatorioFrecuenciaDias = dias;
+  try{ await window.storage.set('recordatorio_frecuencia_dias', String(dias)); }catch(e){ console.error(e); }
+  saveFullSnapshot();
+}
+async function savePreferWhatsappEscritorio(v){
+  preferWhatsappEscritorio = v;
+  try{ await window.storage.set('prefer_whatsapp_escritorio', v?'1':'0'); }catch(e){ console.error(e); }
+  saveFullSnapshot();
+}
+
+// ---------- WhatsApp ----------
+function toWhatsAppNumber(raw){
+  if(!raw) return null;
+  const digits = String(raw).replace(/\D/g,'');
+  return digits.length>=7 ? digits : null;
+}
+function fillTemplate(tpl, vars){
+  let out = tpl;
+  for(const k in vars){ out = out.split('{'+k+'}').join(vars[k]!=null?vars[k]:''); }
+  return out;
+}
+function openWhatsApp(telefono, mensaje, apt){
+  const num = toWhatsAppNumber(telefono);
+  if(!num){ alert('Este apartamento no tiene un teléfono válido registrado. Agrégalo en la pestaña Editar.'); return false; }
+  const text = encodeURIComponent(mensaje);
+  const url = preferWhatsappEscritorio
+    ? ('whatsapp://send?phone='+num+'&text='+text)
+    : ('https://wa.me/'+num+'?text='+text);
+  // Se dispara con un click real sobre un <a>, no window.open(): en apps embebidas
+  // (como el visor de escritorio) esto respeta la sesión de WhatsApp ya iniciada
+  // en el navegador/app del sistema en lugar de abrir una ventana aislada sin cookies.
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  if(apt){ apt.ultimo_envio = new Date().toISOString(); saveApt(apt); }
+  return true;
+}
+// contactos con telefono valido de un apartamento: principal, segundo contacto e inquilino (si esta alquilado)
+function getContactOptions(apt){
+  const opts = [];
+  if(toWhatsAppNumber(apt.telefono)) opts.push({label:'Propietario'+(apt.propietario?' — '+apt.propietario:''), telefono:apt.telefono});
+  if(toWhatsAppNumber(apt.contacto2_telefono)) opts.push({label:'Segundo contacto'+(apt.contacto2_nombre?' — '+apt.contacto2_nombre:''), telefono:apt.contacto2_telefono});
+  if(apt.alquilado && toWhatsAppNumber(apt.inquilino_telefono)) opts.push({label:'Inquilino'+(apt.inquilino_nombre?' — '+apt.inquilino_nombre:''), telefono:apt.inquilino_telefono});
+  return opts;
+}
+function showContactPicker(options, onPick){
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(6,10,15,0.72);z-index:200;display:flex;align-items:center;justify-content:center;';
+  const box = document.createElement('div');
+  box.style.cssText = 'background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px;min-width:260px;max-width:90vw;';
+  const title = document.createElement('h3');
+  title.className = 'section';
+  title.style.marginBottom = '10px';
+  title.textContent = '¿A cuál contacto enviar?';
+  box.appendChild(title);
+  options.forEach(opt=>{
+    const btn = document.createElement('button');
+    btn.className = 'btn ghost';
+    btn.style.cssText = 'display:block;width:100%;margin-bottom:8px;text-align:left;';
+    btn.textContent = opt.label;
+    btn.onclick = ()=>{ document.body.removeChild(overlay); onPick(opt); };
+    box.appendChild(btn);
+  });
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'btn ghost';
+  cancelBtn.style.cssText = 'display:block;width:100%;color:var(--sub);';
+  cancelBtn.textContent = 'Cancelar';
+  cancelBtn.onclick = ()=>{ document.body.removeChild(overlay); };
+  box.appendChild(cancelBtn);
+  overlay.appendChild(box);
+  overlay.onclick = (e)=>{ if(e.target===overlay) document.body.removeChild(overlay); };
+  document.body.appendChild(overlay);
+}
+// arma el mensaje con buildMsg() en el momento del envio (para que use datos frescos) y,
+// si hay mas de un contacto valido, pregunta antes de abrir WhatsApp
+function sendWhatsAppToApt(apt, buildMsg, afterSend){
+  const options = getContactOptions(apt);
+  if(options.length===0){ alert('Este apartamento no tiene ningún teléfono válido registrado. Agrégalo en la pestaña Editar.'); return; }
+  const doSend = (opt)=>{ openWhatsApp(opt.telefono, buildMsg(), apt); if(afterSend) afterSend(true); };
+  if(options.length===1){ doSend(options[0]); return; }
+  showContactPicker(options, doSend);
+}
+function diasDesdeEnvio(apt){
+  if(!apt.ultimo_envio) return Infinity;
+  return (Date.now() - new Date(apt.ultimo_envio).getTime()) / 86400000;
+}
+// deuda pendiente de esta unidad en cada proyecto especial (ej. Pozo de Agua)
+function proyectoDeudas(aptId){
+  const items = [];
+  proyectos.forEach(p=>{
+    const ap = (p.aportes||[]).find(x=>x.apt_id===aptId);
+    if(ap){
+      const pend = Math.max(0, (ap.monto_aporte||0)-(ap.monto_pagado||0));
+      if(pend>0.005) items.push({nombre:p.nombre, monto:pend});
+    }
+  });
+  return items;
+}
+function buildCobroMessage(a, d, projDebts){
+  let msg;
+  if(d){
+    const meses = d.meses!=null ? d.meses : '';
+    const dias = d.meses!=null ? Math.round(d.meses*30) : '';
+    msg = fillTemplate(whatsappTemplateCobro, {nombre:a.propietario||'', id:a.id, monto:d.monto!=null?d.monto:'-', meses, dias});
+  } else {
+    msg = 'Hola '+(a.propietario||'')+', le escribe la Junta de Condominio de Hatillo Hill sobre el apartamento '+a.id+'.';
+  }
+  if(projDebts.length){
+    const lineas = projDebts.map(pd=>pd.nombre+': $'+pd.monto.toFixed(2)+' pendiente').join(' · ');
+    msg += ' También tiene saldo pendiente en proyecto(s) especiales: '+lineas+'.';
+  }
+  return msg;
+}
+
+// ---------- estado -> color ----------
+function pisoColor(piso){
+  if(piso==='PB') return 0x3b82f6; // azul
+  if(piso==='1') return 0x10b981; // verde
+  if(piso==='2') return 0xe5e7eb; // blanco
+  if(piso==='3') return 0xf97316; // naranja
+  if(piso==='PH') return 0x9ca3af; // gris
+  return 0x64748b;
+}
+function estadoColor(estado){
+  if(!estado) return 0x10b981; // entregado
+  const e = estado.toLowerCase();
+  if(e.includes('sin entregar')) return 0xf59e0b;
+  if(e.includes('sin firmar')) return 0xef4444;
+  return 0x10b981;
+}
+function estadoBadgeClass(estado){
+  if(!estado) return 'entregado';
+  const e = estado.toLowerCase();
+  if(e.includes('sin entregar')) return 'sinentregar';
+  if(e.includes('sin firmar')) return 'sinfirmar';
+  return 'entregado';
+}
+function estadoLabel(estado){ return estado || 'Entregado'; }
+
+// ---------- THREE.js setup ----------
+const canvas = document.getElementById('canvasHost');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+const scene = new THREE.Scene();
+
+// cielo de atardecer degradado, generado por canvas (sin depender de imagenes externas)
+function makeSkyTexture(){
+  const c = document.createElement('canvas'); c.width=2; c.height=256;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0,0,0,256);
+  g.addColorStop(0, '#1b2a4a');
+  g.addColorStop(0.45, '#2f4d78');
+  g.addColorStop(0.75, '#7d8fae');
+  g.addColorStop(1, '#c9b79c');
+  ctx.fillStyle = g; ctx.fillRect(0,0,2,256);
+  return new THREE.CanvasTexture(c);
+}
+scene.background = makeSkyTexture();
+scene.fog = new THREE.Fog(0x54637f, 45, 120);
+
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 500);
+let camTarget = new THREE.Vector3(0,6,0);
+let camTheta = 0.75, camPhi = 1.05, camRadius = 34;
+function updateCamera(){
+  const x = camTarget.x + camRadius*Math.sin(camPhi)*Math.sin(camTheta);
+  const y = camTarget.y + camRadius*Math.cos(camPhi);
+  const z = camTarget.z + camRadius*Math.sin(camPhi)*Math.cos(camTheta);
+  camera.position.set(x,y,z);
+  camera.lookAt(camTarget);
+}
+updateCamera();
+
+scene.add(new THREE.HemisphereLight(0x8fa8cc, 0x2a2318, 0.55));
+scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+const dirLight = new THREE.DirectionalLight(0xfff2dd, 1.05);
+dirLight.position.set(20,30,15);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.set(2048,2048);
+dirLight.shadow.camera.left = -45;
+dirLight.shadow.camera.right = 45;
+dirLight.shadow.camera.top = 45;
+dirLight.shadow.camera.bottom = -45;
+dirLight.shadow.camera.near = 1;
+dirLight.shadow.camera.far = 100;
+dirLight.shadow.bias = -0.0015;
+scene.add(dirLight);
+const dirLight2 = new THREE.DirectionalLight(0x88aaff, 0.25);
+dirLight2.position.set(-20,10,-15);
+scene.add(dirLight2);
+
+// ---------- layout constants ----------
+const FLOOR_H = 3.0;
+const FLOOR_ORDER = {'PB':0,'1':1,'2':2,'3':3,'PH':4};
+const CORE_OFFSET = 2.6; // distancia del nucleo (ascensor/escalera) al eje central, alineado con las columnas
+const NUM_SOTANOS = 3;
+const GROUND_Y = -(NUM_SOTANOS+1)*FLOOR_H; // debajo del ultimo sotano, para que los sotanos no queden ocultos
+
+// textura de pavimento generada por canvas (losas de concreto claro)
+// grama tropical (como el entorno verde de las fotos reales), en vez de pavimento gris
+function makeGroundTexture(){
+  const c = document.createElement('canvas'); c.width=256; c.height=256;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#2f5a2e'; ctx.fillRect(0,0,256,256);
+  for(let i=0;i<900;i++){
+    const x = Math.random()*256, y = Math.random()*256;
+    const shade = Math.random()>0.5 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.08)';
+    ctx.fillStyle = shade;
+    ctx.fillRect(x, y, 2, 2);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(40,40);
+  return tex;
+}
+// textura de fachada compartida: concreto claro con ventanas (para todos los apartamentos)
+// fachada fiel a las fotos reales: ladrillo terracota + pilares de concreto claro + ventanas
+function makeFacadeTexture(){
+  const c = document.createElement('canvas'); c.width=128; c.height=128;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#b5623c'; ctx.fillRect(0,0,128,128);
+  // hiladas de ladrillo (lineas horizontales sutiles)
+  ctx.fillStyle = 'rgba(0,0,0,0.08)';
+  for(let y=0;y<128;y+=8){ ctx.fillRect(0,y,128,1); }
+  // pilares de concreto claro entre vanos
+  ctx.fillStyle = '#d8d3c7';
+  ctx.fillRect(0,0,10,128);
+  ctx.fillRect(59,0,10,128);
+  ctx.fillRect(118,0,10,128);
+  // ventanas con vidrio oscuro
+  ctx.fillStyle = '#33475a';
+  for(let y=10;y<128;y+=34){
+    ctx.fillRect(20,y,28,24);
+    ctx.fillRect(80,y,28,24);
+    ctx.fillStyle = 'rgba(255,255,255,0.16)';
+    ctx.fillRect(20,y,28,5);
+    ctx.fillRect(80,y,28,5);
+    ctx.fillStyle = '#33475a';
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+const FACADE_TEX = makeFacadeTexture();
+
+// reja de ladrillo calado (patron perforado), como en el nivel de sotano/estacionamiento de las fotos
+function makeCaladoTexture(){
+  const c = document.createElement('canvas'); c.width=128; c.height=64;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#8f4a2c'; ctx.fillRect(0,0,128,64);
+  ctx.fillStyle = '#5f2f1a';
+  for(let y=6;y<64;y+=16){
+    for(let x=6;x<128;x+=16){
+      ctx.fillRect(x,y,9,9);
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(8,2);
+  return tex;
+}
+const CALADO_TEX = makeCaladoTexture();
+
+// ground (colocado bajo el ultimo sotano para que los sotanos se vean igual que los pisos)
+const groundGeo = new THREE.PlaneGeometry(160,160);
+const groundMat = new THREE.MeshStandardMaterial({map:makeGroundTexture(), color:0x8fae7a, roughness:1});
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI/2;
+ground.position.y = GROUND_Y;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const gridHelper = new THREE.GridHelper(160,80,0x223044,0x1a2432);
+gridHelper.position.y = GROUND_Y+0.01;
+scene.add(gridHelper);
+const CELL_W = 2.1, CELL_D = 1.6, GAP=0.35;
+
+const objectsGroup = new THREE.Group();
+scene.add(objectsGroup);
+const raycastTargets = [];
+
+// palmeras y arbustos tropicales alrededor del edificio, como en las fotos reales (se crean una sola vez)
+function makePalmTree(scale){
+  const g = new THREE.Group();
+  const trunkMat = new THREE.MeshStandardMaterial({color:0x6b5738, roughness:0.9});
+  const trunkGeo = new THREE.CylinderGeometry(0.09*scale, 0.15*scale, 3.4*scale, 6);
+  const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+  trunk.position.y = 1.7*scale;
+  trunk.rotation.z = (Math.random()-0.5)*0.12;
+  trunk.castShadow = true;
+  g.add(trunk);
+  const frondMat = new THREE.MeshStandardMaterial({color:0x3f8a3f, roughness:0.75, side:THREE.DoubleSide});
+  const topY = 3.3*scale;
+  for(let i=0;i<7;i++){
+    const ang = (i/7)*Math.PI*2;
+    const frondGeo = new THREE.ConeGeometry(0.32*scale, 1.7*scale, 4);
+    const frond = new THREE.Mesh(frondGeo, frondMat);
+    frond.position.set(Math.cos(ang)*0.55*scale, topY+0.2*scale, Math.sin(ang)*0.55*scale);
+    frond.rotation.x = Math.PI/2 - 0.55;
+    frond.rotation.z = ang;
+    frond.castShadow = true;
+    g.add(frond);
+  }
+  return g;
+}
+function makeBush(scale){
+  const mat = new THREE.MeshStandardMaterial({color:0x2f6e3a, roughness:0.85});
+  const bush = new THREE.Mesh(new THREE.SphereGeometry(0.5*scale, 8, 6), mat);
+  bush.position.y = 0.4*scale;
+  bush.scale.y = 0.8;
+  bush.castShadow = true; bush.receiveShadow = true;
+  return bush;
+}
+function addLandscaping(){
+  const spots = [
+    {x:-22, z:14, s:1.1}, {x:-18, z:20, s:0.9}, {x:22, z:12, s:1.2}, {x:26, z:-8, s:1.0},
+    {x:-24, z:-10, s:0.95}, {x:18, z:22, s:1.05}, {x:-14, z:24, s:0.85}, {x:24, z:2, s:1.15}
+  ];
+  spots.forEach(sp=>{
+    const palm = makePalmTree(sp.s);
+    palm.position.set(sp.x, GROUND_Y, sp.z);
+    scene.add(palm);
+  });
+  const bushSpots = [
+    {x:-16,z:10},{x:-13,z:9},{x:16,z:9},{x:19,z:11},{x:-20,z:16},{x:21,z:17},{x:-11,z:16},{x:14,z:18}
+  ];
+  bushSpots.forEach(sp=>{
+    const bush = makeBush(0.9+Math.random()*0.4);
+    bush.position.set(sp.x, GROUND_Y, sp.z);
+    scene.add(bush);
+  });
+}
+addLandscaping();
+
+function apartmentsByTowerFloor(torre,piso){
+  return apartments.filter(a=>a.torre===torre && a.piso===piso)
+    .sort((a,b)=>{
+      const na = parseInt((a.id.split('-').pop()||'0').replace(/\D/g,'')) || 0;
+      const nb = parseInt((b.id.split('-').pop()||'0').replace(/\D/g,'')) || 0;
+      return na-nb;
+    });
+}
+
+// distribución real de apartamentos por piso: columna izquierda (1..n/2, cerca->lejos del nucleo)
+// columna derecha: en Torre A invertida (n..n/2+1), en Torre B normal (n/2+1..n) - según plano
+function layoutColumns(torre, n){
+  const half = Math.ceil(n/2);
+  const left = [];
+  for(let i=1;i<=half;i++) left.push(i);
+  const right = [];
+  if(torre==='A'){
+    for(let i=n;i>half;i--) right.push(i);
+  } else {
+    for(let i=half+1;i<=n;i++) right.push(i);
+  }
+  return {left, right};
+}
+
+function makeTextSprite(text, opts){
+  opts = opts||{};
+  const lines = String(text).split('\n');
+  const canvas2 = document.createElement('canvas');
+  const ctx = canvas2.getContext('2d');
+  const fontSize = opts.fontSize||42;
+  const pad = opts.pad!==undefined ? opts.pad : 20;
+  ctx.font = (opts.weight||'bold')+' '+fontSize+'px sans-serif';
+  let maxW = 0;
+  lines.forEach(l=>{ maxW = Math.max(maxW, ctx.measureText(l).width); });
+  const w = Math.max(maxW+pad*2, pad*3);
+  const lineH = fontSize*1.12;
+  canvas2.width = w; canvas2.height = lineH*lines.length+pad*0.6;
+  ctx.font = (opts.weight||'bold')+' '+fontSize+'px sans-serif';
+  ctx.fillStyle = opts.bg || 'rgba(10,15,22,0.85)';
+  if(opts.radius){
+    const r = opts.radius;
+    ctx.beginPath();
+    ctx.moveTo(r,0); ctx.arcTo(canvas2.width,0,canvas2.width,canvas2.height,r);
+    ctx.arcTo(canvas2.width,canvas2.height,0,canvas2.height,r); ctx.arcTo(0,canvas2.height,0,0,r);
+    ctx.arcTo(0,0,canvas2.width,0,r); ctx.closePath(); ctx.fill();
+  } else {
+    ctx.fillRect(0,0,canvas2.width,canvas2.height);
+  }
+  ctx.fillStyle = opts.color || '#e7edf5';
+  ctx.textBaseline = 'middle';
+  lines.forEach((l,i)=>{ ctx.fillText(l, pad, lineH*(i+0.5)+pad*0.3); });
+  const tex = new THREE.CanvasTexture(canvas2);
+  const mat = new THREE.SpriteMaterial({map:tex, depthTest:false, depthWrite:false, transparent:true});
+  const sprite = new THREE.Sprite(mat);
+  const scaleF = (opts.scale||0.01);
+  sprite.scale.set(canvas2.width*scaleF, canvas2.height*scaleF, 1);
+  return sprite;
+}
+
+let towerLabelSprites = [];
+let floorLabelSprites = [];
+
+function buildScene(){
+  // clear
+  while(objectsGroup.children.length) objectsGroup.remove(objectsGroup.children[0]);
+  raycastTargets.length = 0;
+  towerLabelSprites = [];
+  floorLabelSprites = [];
+
+  ['A','B'].forEach(torre=>{
+    const zSign = torre==='A' ? 1 : -1;
+
+    let maxFarZ = 0;
+    PISOS.forEach(piso=>{
+      const y = FLOOR_ORDER[piso]*FLOOR_H;
+      const list = apartmentsByTowerFloor(torre,piso);
+      if(list.length===0) return;
+      const n = list.length;
+      const {left, right} = layoutColumns(torre, n);
+      const rows = left.length;
+      const totalW = CORE_OFFSET*2 + CELL_W;
+      const totalD = rows*(CELL_D+GAP);
+      const zFar = totalD; // extremo lejano al nucleo
+      if(zFar > maxFarZ) maxFarZ = zFar;
+
+      // floor slab (se extiende desde el nucleo z=0 hacia zSign*zFar)
+      const slabGeo = new THREE.BoxGeometry(totalW+1.4, 0.18, totalD+1.0);
+      const slabMat = new THREE.MeshStandardMaterial({color:0x1c2735, roughness:0.9, transparent:true, opacity:0.85});
+      const slab = new THREE.Mesh(slabGeo, slabMat);
+      slab.position.set(0, y-0.15, zSign*(totalD/2));
+      slab.receiveShadow = true;
+      objectsGroup.add(slab);
+
+      // floor label
+      const fLabel = makeTextSprite('Piso '+piso+' - Torre '+torre, {fontSize:26, color: torre==='A' ? '#60a5fa' : '#c084fc'});
+      fLabel.position.set(-totalW/2-1.8, y+0.6, zSign*(totalD/2));
+      objectsGroup.add(fLabel);
+      floorLabelSprites.push({sprite:fLabel, piso});
+
+      function placeApt(numero, colX, rowIdx){
+        const apt = list.find(a=>{
+          const nn = parseInt((a.id.split('-').pop()||'0').replace(/\D/g,'')) || 0;
+          return nn===numero;
+        });
+        if(!apt) return;
+        const isSel = selected && selected.type==='apt' && selected.ref.id===apt.id;
+        const hidden = (filterPiso!=='ALL' && filterPiso!==piso) || (filterTorre!=='ALL' && filterTorre!==torre) || (filterSotano!==null) || (filterDeuda==='con' && !findDeuda(apt)) || (filterDeuda==='sin' && !!findDeuda(apt));
+        if(hidden && !isSel) return; // desaparece por completo si no coincide con el filtro
+        const pz = zSign*((rowIdx+0.5)*(CELL_D+GAP));
+        const h = FLOOR_H*0.72;
+        const geo = new THREE.BoxGeometry(CELL_W*0.92, h, CELL_D*0.92);
+        const mat = isSel
+          ? new THREE.MeshStandardMaterial({ color: HILITE_COLOR, roughness:0.4, metalness:0.05, emissive: HILITE_COLOR, emissiveIntensity: 1.1 })
+          : new THREE.MeshStandardMaterial({ map: FACADE_TEX, color: 0xffffff, roughness:0.75, metalness:0.02 });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(colX, y+h/2, pz);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.userData = {type:'apt', ref:apt};
+        objectsGroup.add(mesh);
+        raycastTargets.push(mesh);
+
+        // franja de color por piso (mantiene el codigo visual PB/1/2/3/PH sobre la fachada realista)
+        if(!isSel){
+          const capGeo = new THREE.BoxGeometry(CELL_W*0.94, FLOOR_H*0.09, CELL_D*0.94);
+          const capMat = new THREE.MeshStandardMaterial({color: pisoColor(apt.piso), roughness:0.5, metalness:0.05});
+          const cap = new THREE.Mesh(capGeo, capMat);
+          cap.position.set(colX, y+h+FLOOR_H*0.045, pz);
+          cap.castShadow = true;
+          objectsGroup.add(cap);
+        }
+      }
+      // orientacion real (parado frente a la entrada): derecha=lado ascensor, izquierda=lado escalera
+      left.forEach((numero,i)=> placeApt(numero, CORE_OFFSET, i));
+      right.forEach((numero,i)=> placeApt(numero, -CORE_OFFSET, i));
+
+      // pasillo con plantas: marcadores decorativos en el eje central del corredor
+      for(let i=0;i<rows;i++){
+        const pz = zSign*((i+0.5)*(CELL_D+GAP));
+        const potGeo = new THREE.CylinderGeometry(0.14,0.18,0.32,8);
+        const potMat = new THREE.MeshStandardMaterial({color:0x14532d, roughness:0.8});
+        const pot = new THREE.Mesh(potGeo, potMat);
+        pot.position.set(0, y+0.16, pz);
+        objectsGroup.add(pot);
+        const leafGeo = new THREE.ConeGeometry(0.22,0.5,8);
+        const leafMat = new THREE.MeshStandardMaterial({color:0x22c55e, roughness:0.7});
+        const leaf = new THREE.Mesh(leafGeo, leafMat);
+        leaf.position.set(0, y+0.16+0.4, pz);
+        objectsGroup.add(leaf);
+      }
+
+      // etiqueta "Entrada Principal" en el extremo lejano de Torre A, solo en PB
+      if(torre==='A' && piso==='PB'){
+        const entLabel = makeTextSprite('ENTRADA PRINCIPAL', {fontSize:30, color:'#fbbf24'});
+        entLabel.position.set(0, y+2.2, zSign*(totalD+1.2));
+        objectsGroup.add(entLabel);
+      }
+    });
+  });
+
+  // núcleo central: ascensor y escaleras entre las dos torres
+  const coreTop = FLOOR_ORDER['PH']*FLOOR_H + FLOOR_H*0.72;
+  const coreBottom = -(NUM_SOTANOS)*FLOOR_H;
+  const coreH = coreTop - coreBottom;
+  const coreMidY = (coreTop+coreBottom)/2;
+
+  const elevGeo = new THREE.BoxGeometry(1.6, coreH, 1.6);
+  const elevMat = new THREE.MeshStandardMaterial({color:0x475569, roughness:0.4, metalness:0.3});
+  const elevMesh = new THREE.Mesh(elevGeo, elevMat);
+  elevMesh.position.set(CORE_OFFSET, coreMidY, 0);
+  elevMesh.castShadow = true; elevMesh.receiveShadow = true;
+  objectsGroup.add(elevMesh);
+  const elevLabel = makeTextSprite('Ascensor', {fontSize:26, color:'#cbd5e1'});
+  elevLabel.position.set(CORE_OFFSET, coreTop+0.9, 0);
+  objectsGroup.add(elevLabel);
+
+  const stairGeo = new THREE.BoxGeometry(1.6, coreH, 1.6);
+  const stairMat = new THREE.MeshStandardMaterial({color:0x57534e, roughness:0.7});
+  const stairMesh = new THREE.Mesh(stairGeo, stairMat);
+  stairMesh.position.set(-CORE_OFFSET, coreMidY, 0);
+  stairMesh.castShadow = true; stairMesh.receiveShadow = true;
+  objectsGroup.add(stairMesh);
+  const stairLabel = makeTextSprite('Escaleras', {fontSize:26, color:'#cbd5e1'});
+  stairLabel.position.set(-CORE_OFFSET, coreTop+0.9, 0);
+  objectsGroup.add(stairLabel);
+
+  // arco curvo sobre el nucleo, uniendo ascensor y escaleras (rasgo distintivo del edificio real en las fotos)
+  (function(){
+    const halfSpan = CORE_OFFSET;
+    const archHeight = CORE_OFFSET*0.85;
+    const segments = 16;
+    const archMat = new THREE.MeshStandardMaterial({color:0xe8e3d5, roughness:0.55, metalness:0.05});
+    const segLen = (Math.PI*halfSpan/segments)*1.2;
+    for(let i=0;i<=segments;i++){
+      const t = i/segments;
+      const ang = Math.PI*t;
+      const x = -halfSpan*Math.cos(ang);
+      const yOff = archHeight*Math.sin(ang);
+      const tangentAngle = Math.atan2(archHeight*Math.cos(ang), halfSpan*Math.sin(ang)||0.0001);
+      const seg = new THREE.Mesh(new THREE.BoxGeometry(segLen, 0.35, 0.55), archMat);
+      seg.position.set(x, coreTop+yOff, 0);
+      seg.rotation.z = tangentAngle;
+      seg.castShadow = true; seg.receiveShadow = true;
+      objectsGroup.add(seg);
+    }
+  })();
+
+  // sótanos (mismo estilo visual que los pisos, apilados debajo de PB, siempre visibles)
+  const matchedParkNums = new Set();
+  const matchedMaletNums = new Set();
+  if(selected && selected.type==='apt'){
+    selected.ref.componentes.forEach(c=>{
+      const n = extractDigits(c.label);
+      if(n===null) return;
+      if(c.tipo==='Estacionamiento') matchedParkNums.add(n);
+      if(c.tipo==='Maletero') matchedMaletNums.add(n);
+    });
+  }
+
+  SOTANOS.forEach((sKey, si)=>{
+    const y = -(si+1)*FLOOR_H;
+    const puestosSot = parking.filter(p=>String(p.sotano)===sKey).sort((a,b)=>a.numero-b.numero);
+    const maletSot = maleteros.filter(m=>String(m.sotano)===sKey).sort((a,b)=>a.numero-b.numero);
+    const cols = 8;
+    const cw = 1.9, cd = 1.5, gap=0.3;
+    const rowsPuestos = Math.max(1, Math.ceil(puestosSot.length/cols));
+    const rowsMalet = Math.max(1, Math.ceil(maletSot.length/cols));
+    const totalW = cols*(cw+gap)-gap;
+    const totalD = (rowsPuestos+rowsMalet)*(cd+gap)-gap + 1.0; // fila extra de separacion visual
+
+    const slabGeo = new THREE.BoxGeometry(totalW+1.6, 0.18, totalD+1.6);
+    const slabMat = new THREE.MeshStandardMaterial({color:0x1c2735, roughness:0.9, transparent:true, opacity:0.85});
+    const slab = new THREE.Mesh(slabGeo, slabMat);
+    slab.position.set(0, y-0.15, 0);
+    slab.receiveShadow = true;
+    objectsGroup.add(slab);
+
+    // muro perimetral con reja de ladrillo calado, como en el nivel de sotano de las fotos reales
+    (function(){
+      const wallH = 1.4;
+      const wallY = y - 0.06 + wallH/2;
+      const wallMat = new THREE.MeshStandardMaterial({map: CALADO_TEX, color:0xffffff, roughness:0.85});
+      const wallThick = 0.12;
+      const wallFront = new THREE.Mesh(new THREE.BoxGeometry(totalW+1.6, wallH, wallThick), wallMat);
+      wallFront.position.set(0, wallY, (totalD+1.6)/2);
+      wallFront.receiveShadow = true; wallFront.castShadow = true;
+      objectsGroup.add(wallFront);
+      const wallBack = wallFront.clone();
+      wallBack.position.set(0, wallY, -(totalD+1.6)/2);
+      objectsGroup.add(wallBack);
+      const wallLeft = new THREE.Mesh(new THREE.BoxGeometry(wallThick, wallH, totalD+1.6), wallMat);
+      wallLeft.position.set(-(totalW+1.6)/2, wallY, 0);
+      wallLeft.receiveShadow = true; wallLeft.castShadow = true;
+      objectsGroup.add(wallLeft);
+      const wallRight = wallLeft.clone();
+      wallRight.position.set((totalW+1.6)/2, wallY, 0);
+      objectsGroup.add(wallRight);
+    })();
+
+    const lbl = makeTextSprite('Sótano '+sKey, {fontSize:30, color:'#94a3b8'});
+    lbl.position.set(-totalW/2-1.8, y+0.5, 0);
+    objectsGroup.add(lbl);
+    floorLabelSprites.push({sprite:lbl, piso:'SOTANO'+sKey});
+
+    const hiddenSot = filterSotano!==null && filterSotano!==sKey;
+
+    function placeRow(list, kind, rowOffset){
+      list.forEach((item, idx)=>{
+        const col = idx % cols;
+        const row = Math.floor(idx/cols);
+        const px = -totalW/2 + col*(cw+gap) + cw/2;
+        const pz = -totalD/2 + (rowOffset+row)*(cd+gap) + cd/2;
+        const num = item.numero;
+        const directSel = selected && ((kind==='park'&&selected.type==='park'&&String(selected.ref.numero)===String(item.numero)) || (kind==='malet'&&selected.type==='malet'&&String(selected.ref.numero)===String(item.numero)));
+        const relatedSel = selected && selected.type==='apt' && ((kind==='park'&&matchedParkNums.has(num)) || (kind==='malet'&&matchedMaletNums.has(num)));
+        const isSel = directSel || relatedSel;
+        if(hiddenSot && !isSel) return; // desaparece por completo si no coincide con el filtro
+        const h = kind==='park' ? 0.35 : 0.9;
+        const geo = new THREE.BoxGeometry(cw*0.85, h, cd*0.85);
+        const mat = new THREE.MeshStandardMaterial({
+          color: isSel ? HILITE_COLOR : (kind==='park' ? 0x64748b : 0xa16207),
+          roughness:0.6,
+          emissive: isSel ? HILITE_COLOR : 0x000000,
+          emissiveIntensity: isSel ? 1.1 : 0
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(px, y+h/2, pz);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.userData = {type:kind, ref:item, sotano: sKey};
+        objectsGroup.add(mesh);
+        raycastTargets.push(mesh);
+      });
+    }
+    placeRow(puestosSot, 'park', 0);
+    placeRow(maletSot, 'malet', rowsPuestos + 0.7);
+  });
+
+  updateSpriteVisibility();
+}
+
+function updateSpriteVisibility(){
+  towerLabelSprites.forEach(s=>{ s.visible = filterSotano===null; });
+}
+
+function rebuildScene(){ buildScene(); }
+
+// ---------- interaction: orbit ----------
+let isDragging=false, lastX=0, lastY=0, dragMoved=false;
+canvas.addEventListener('pointerdown', (e)=>{
+  isDragging=true; dragMoved=false; lastX=e.clientX; lastY=e.clientY;
+  canvas.classList.add('dragging');
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointermove', (e)=>{
+  if(isDragging){
+    const dx = e.clientX-lastX, dy = e.clientY-lastY;
+    if(Math.abs(dx)+Math.abs(dy) > 3) dragMoved=true;
+    camTheta -= dx*0.006;
+    camPhi -= dy*0.006;
+    camPhi = Math.max(0.35, Math.min(1.5, camPhi));
+    lastX=e.clientX; lastY=e.clientY;
+    updateCamera();
+  } else {
+    handleHover(e);
+  }
+});
+window.addEventListener('pointerup', (e)=>{
+  if(isDragging && !dragMoved){ handleClick(e); }
+  isDragging=false;
+  canvas.classList.remove('dragging');
+});
+canvas.addEventListener('wheel', (e)=>{
+  e.preventDefault();
+  camRadius += e.deltaY*0.02;
+  camRadius = Math.max(10, Math.min(70, camRadius));
+  updateCamera();
+}, {passive:false});
+
+// pinch-to-zoom tactil (wheel no existe en moviles)
+let pinchDist = null;
+function touchDist(touches){
+  const dx = touches[0].clientX - touches[1].clientX;
+  const dy = touches[0].clientY - touches[1].clientY;
+  return Math.hypot(dx,dy);
+}
+canvas.addEventListener('touchstart', (e)=>{
+  if(e.touches.length===2){
+    pinchDist = touchDist(e.touches);
+    isDragging = false;
+  }
+}, {passive:true});
+canvas.addEventListener('touchmove', (e)=>{
+  if(e.touches.length===2 && pinchDist!==null){
+    e.preventDefault();
+    const d = touchDist(e.touches);
+    camRadius += (pinchDist-d)*0.04;
+    camRadius = Math.max(10, Math.min(70, camRadius));
+    pinchDist = d;
+    updateCamera();
+  }
+}, {passive:false});
+canvas.addEventListener('touchend', (e)=>{
+  if(e.touches.length<2) pinchDist = null;
+}, {passive:true});
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+const tooltip = document.getElementById('tooltip');
+
+function getMouseNDC(e){
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = ((e.clientX-rect.left)/rect.width)*2-1;
+  mouse.y = -((e.clientY-rect.top)/rect.height)*2+1;
+}
+
+function handleHover(e){
+  getMouseNDC(e);
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(raycastTargets);
+  if(hits.length){
+    const obj = hits[0].object;
+    const d = obj.userData;
+    let text = '';
+    if(d.type==='apt'){ text = '<b>'+d.ref.id+'</b> · '+(d.ref.propietario||'Sin propietario'); }
+    else if(d.type==='park'){ text = '<b>Puesto #'+d.ref.numero+'</b> · Estacionamiento'; }
+    else if(d.type==='malet'){ text = '<b>Maletero #'+d.ref.numero+'</b>'; }
+    tooltip.innerHTML = text;
+    tooltip.style.display='block';
+    tooltip.style.left = (e.clientX+14)+'px';
+    tooltip.style.top = (e.clientY+10)+'px';
+    canvas.style.cursor='pointer';
+  } else {
+    tooltip.style.display='none';
+    canvas.style.cursor='grab';
+  }
+}
+
+function handleClick(e){
+  getMouseNDC(e);
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(raycastTargets);
+  if(hits.length){
+    const d = hits[0].object.userData;
+    selected = {type:d.type, ref:d.ref};
+    currentTab='editar';
+    renderSidebar();
+    buildScene();
+    if(window.innerWidth<=820){ document.getElementById('sidebar').classList.remove('hidden'); }
+  }
+}
+
+// ---------- render loop ----------
+function resize(){
+  const w = document.getElementById('viewport').clientWidth;
+  const h = document.getElementById('viewport').clientHeight;
+  renderer.setSize(w,h,false);
+  camera.aspect = w/h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+
+function animate(){
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+
+// ---------- UI: top filter bars ----------
+function renderTopbar(){
+  const pisoBar = document.getElementById('pisoBar');
+  pisoBar.innerHTML = '';
+  const allBtn = document.createElement('button');
+  allBtn.className = 'chip'+(filterPiso==='ALL'&&filterSotano===null?' active':'');
+  allBtn.textContent='Todos';
+  allBtn.onclick=()=>{ filterPiso='ALL'; filterSotano=null; focusAll(); };
+  pisoBar.appendChild(allBtn);
+  PISOS.forEach(p=>{
+    const b=document.createElement('button');
+    b.className='chip'+(filterPiso===p&&filterSotano===null?' active':'');
+    b.textContent='Piso '+p;
+    b.onclick=()=>{ filterPiso=p; filterSotano=null; focusFloor(p); };
+    pisoBar.appendChild(b);
+  });
+
+  const sotanoBar = document.getElementById('sotanoBar');
+  sotanoBar.innerHTML='';
+  SOTANOS.forEach(s=>{
+    const b=document.createElement('button');
+    b.className='chip'+(filterSotano===s?' active':'');
+    b.textContent='Sótano '+s;
+    b.onclick=()=>{ filterSotano = (filterSotano===s? null : s); filterPiso='ALL'; focusSotano(filterSotano); };
+    sotanoBar.appendChild(b);
+  });
+
+  const torreBar = document.getElementById('torreBar');
+  torreBar.innerHTML='';
+  ['A','B'].forEach(t=>{
+    const b=document.createElement('button');
+    b.className='chip'+(filterTorre===t?' active':'');
+    b.textContent='Torre '+t;
+    b.onclick=()=>{ filterTorre = (filterTorre===t? 'ALL' : t); rebuildScene(); };
+    torreBar.appendChild(b);
+  });
+
+  const deudaBar = document.getElementById('deudaBar');
+  deudaBar.innerHTML='';
+  [[null,'Todos'],['con','Con deuda'],['sin','Sin deuda']].forEach(([val,label])=>{
+    const b=document.createElement('button');
+    b.className='chip deudachip'+(filterDeuda===val?' active':'');
+    b.textContent=label;
+    b.onclick=()=>{ filterDeuda = val; rebuildScene(); renderSidebar(); renderTopbar(); };
+    deudaBar.appendChild(b);
+  });
+}
+
+function focusAll(){
+  camTarget.set(0,6,0); camRadius=34; camPhi=1.05; camTheta=0.75;
+  updateCamera(); rebuildScene(); renderTopbar();
+}
+function focusFloor(piso){
+  const y = FLOOR_ORDER[piso]*FLOOR_H;
+  camTarget.set(0, y+1.5, 0); camRadius=24; camPhi=1.0;
+  updateCamera(); rebuildScene(); renderTopbar();
+}
+function focusSotano(s){
+  if(s===null){ focusAll(); return; }
+  const y = -parseInt(s,10)*FLOOR_H;
+  camTarget.set(0, y+1, 0); camRadius=22; camPhi=1.0;
+  updateCamera(); rebuildScene(); renderTopbar();
+}
+
+// ---------- sidebar rendering ----------
+function esc(s){ return (s===null||s===undefined) ? '' : String(s); }
+
+function renderSidebar(){
+  document.querySelectorAll('.stab').forEach(t=>{
+    t.classList.toggle('active', t.dataset.tab===currentTab);
+  });
+  const body = document.getElementById('sidebarBody');
+  body.innerHTML='';
+  if(currentTab==='lista') renderListaTab(body);
+  else if(currentTab==='editar') renderEditarTab(body);
+  else if(currentTab==='deuda') renderDeudaTab(body);
+  else if(currentTab==='proyectos') renderProyectosTab(body);
+  else renderResumenTab(body);
+}
+
+function renderListaTab(body){
+  const settings = document.createElement('details');
+  settings.style.marginBottom = '12px';
+  settings.innerHTML = `
+    <summary style="cursor:pointer;font-size:12.5px;font-weight:700;color:var(--sub);padding:4px 0;">⚙️ Configurar WhatsApp</summary>
+    <div style="margin-top:10px;">
+      <div class="form-row"><label>Plantilla general (sin deuda)</label>
+        <textarea id="tplGeneral" style="width:100%;min-height:60px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:9px;font-size:12px;">${esc(whatsappTemplateGeneral)}</textarea>
+      </div>
+      <div class="form-row"><label>Plantilla de cobro (morosos)</label>
+        <textarea id="tplCobro" style="width:100%;min-height:60px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:9px;font-size:12px;">${esc(whatsappTemplateCobro)}</textarea>
+      </div>
+      <div class="assumption">Variables: {nombre}, {id}, {monto}, {meses}, {dias} (aprox. meses×30).</div>
+      <div class="form-row two">
+        <div><label>Recordar cada (días)</label><input id="frecDias" type="number" min="1" value="${recordatorioFrecuenciaDias}"></div>
+        <div style="display:flex;align-items:flex-end;padding-bottom:8px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sub);font-weight:600;">
+            <input id="chkEscritorio" type="checkbox" ${preferWhatsappEscritorio?'checked':''}> App de escritorio
+          </label>
+        </div>
+      </div>
+      <div class="savebar"><button class="btn primary" id="btnGuardarConfigWA" style="flex:1;">Guardar configuración</button></div>
+      <div class="savedFlag" id="flagConfigWA"></div>
+      <h3 class="section" style="margin-top:14px;">Cargar teléfonos en lote</h3>
+      <div class="assumption">Pega "ID [TAB] Teléfono" o "ID [TAB] Propietario [TAB] Teléfono" (no cambia nombres si solo pegas 2 columnas).</div>
+      <textarea id="telefonosPaste" placeholder="A-PB-2	584121234567" style="width:100%;min-height:60px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:9px;font-size:12px;font-family:monospace;"></textarea>
+      <div class="savebar" style="margin-top:8px;"><button class="btn ghost" id="btnCargarTelefonos" style="flex:1;">Actualizar teléfonos</button></div>
+      <div class="savedFlag" id="flagTelefonos"></div>
+    </div>
+  `;
+  body.appendChild(settings);
+  document.getElementById('btnGuardarConfigWA').onclick = async ()=>{
+    await saveWhatsappTemplateGeneral(document.getElementById('tplGeneral').value);
+    await saveWhatsappTemplateCobro(document.getElementById('tplCobro').value);
+    await saveRecordatorioFrecuencia(parseInt(document.getElementById('frecDias').value,10) || 15);
+    await savePreferWhatsappEscritorio(document.getElementById('chkEscritorio').checked);
+    const flag = document.getElementById('flagConfigWA');
+    flag.textContent = '✓ Configuración guardada';
+    setTimeout(()=>{ if(flag) flag.textContent=''; }, 2000);
+  };
+  document.getElementById('btnCargarTelefonos').onclick = async ()=>{
+    const rows = parseTelefonoPaste(document.getElementById('telefonosPaste').value);
+    const flag = document.getElementById('flagTelefonos');
+    let matched=0; const sinMatch=[];
+    for(const r of rows){
+      const apt = apartments.find(a=>normalizeId(a.id)===normalizeId(r.id));
+      if(!apt){ sinMatch.push(r.id); continue; }
+      if(r.telefono) apt.telefono = r.telefono;
+      if(r.propietario) apt.propietario = r.propietario;
+      await saveApt(apt);
+      matched++;
+    }
+    flag.textContent = '✓ '+matched+' apartamento(s) actualizado(s)'+(sinMatch.length? ' · sin coincidencia: '+sinMatch.join(', ') : '');
+    document.getElementById('telefonosPaste').value = '';
+    setTimeout(()=>{ renderList(body, document.querySelector('.searchbox')?document.querySelector('.searchbox').value.toLowerCase():''); }, 1500);
+  };
+
+  const totalCondoDebt = deudaRows.reduce((s,r)=>s+(r.monto||0),0);
+  const aptsConCondoDebt = apartments.filter(a=>findDeuda(a)).length;
+  const totalProjDebt = proyectos.reduce((s,p)=>s+(p.aportes||[]).reduce((s2,ap)=>s2+Math.max(0,(ap.monto_aporte||0)-(ap.monto_pagado||0)),0),0);
+  const aptsConProjDebt = apartments.filter(a=>proyectoDeudas(a.id).length>0).length;
+  const resumenBox = document.createElement('div');
+  resumenBox.className = 'assumption';
+  resumenBox.style.cssText = 'display:flex;flex-direction:column;gap:3px;margin-bottom:10px;';
+  resumenBox.innerHTML =
+    '<div><b style="color:var(--text);">Deuda condominio:</b> $'+totalCondoDebt.toLocaleString(undefined,{maximumFractionDigits:2})+' ('+aptsConCondoDebt+' apto(s))</div>'+
+    '<div><b style="color:var(--text);">Deuda proyecto(s) en curso:</b> $'+totalProjDebt.toLocaleString(undefined,{maximumFractionDigits:2})+' ('+aptsConProjDebt+' apto(s))</div>';
+  body.appendChild(resumenBox);
+
+  const search = document.createElement('input');
+  search.className='searchbox';
+  search.placeholder='Buscar por apto, propietario o piso...';
+  search.oninput = ()=>{ renderList(body, search.value.toLowerCase()); };
+  body.appendChild(search);
+  const listHost = document.createElement('div');
+  listHost.id='listHost';
+  body.appendChild(listHost);
+  renderList(body, '');
+}
+
+function renderList(body, q){
+  const listHost = document.getElementById('listHost');
+  listHost.innerHTML='';
+  let items = apartments.filter(a=>{
+    if(filterPiso!=='ALL' && a.piso!==filterPiso) return false;
+    if(filterTorre!=='ALL' && a.torre!==filterTorre) return false;
+    if(filterDeuda==='con' && !findDeuda(a)) return false;
+    if(filterDeuda==='sin' && !!findDeuda(a)) return false;
+    if(q){
+      const hay = (a.id+' '+(a.propietario||'')+' '+a.piso+' '+a.torre).toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  if(filterSotano!==null){
+    const allSpots = [...parking.map(p=>({...p,kind:'park'})), ...maleteros.map(m=>({...m,kind:'malet'}))];
+    const half = Math.ceil(allSpots.length/2);
+    const group = filterSotano==='1' ? allSpots.slice(0,half) : allSpots.slice(half);
+    group.filter(it=>{
+      if(!q) return true;
+      return ('#'+it.numero).toLowerCase().includes(q);
+    }).forEach(it=>{
+      const card=document.createElement('div');
+      card.className='card';
+      card.innerHTML = '<div class="idrow"><span class="idlabel">'+(it.kind==='park'?'Puesto #':'Maletero #')+it.numero+'</span>'+
+        '<span class="badge" style="background:rgba(100,116,139,.18);color:#94a3b8;">'+(it.kind==='park'?'Estac.':'Maletero')+'</span></div>'+
+        '<div class="meta">'+(it.m2||'-')+' m² · alícuota '+(it.alicuota||0)+'</div>';
+      card.onclick=()=>{ selected={type:it.kind, ref: it.kind==='park'? parking.find(p=>String(p.numero)===String(it.numero)) : maleteros.find(m=>String(m.numero)===String(it.numero))}; currentTab='editar'; renderSidebar(); buildScene(); };
+      listHost.appendChild(card);
+    });
+    if(group.length===0){ listHost.innerHTML='<div class="empty">Sin resultados.</div>'; }
+    return;
+  }
+  if(items.length===0){
+    listHost.innerHTML = '<div class="empty"><div class="big">🔍</div>Sin resultados.</div>';
+    return;
+  }
+  items.forEach(a=>{
+    const card = document.createElement('div');
+    card.className='card';
+    const d = findDeuda(a);
+    const projDebts = proyectoDeudas(a.id);
+    const tieneDeuda = !!d || projDebts.length>0;
+    const deudaHtml = d ? '<div class="meta" style="color:#ef4444;">Deuda condominio: $'+(d.monto!=null?d.monto:'-')+(d.meses!=null?' ('+d.meses+' m)':'')+'</div>' : '';
+    const projDebtHtml = projDebts.map(pd=>'<div class="meta" style="color:#f59e0b;">'+esc(pd.nombre)+': $'+pd.monto.toFixed(2)+' pendiente</div>').join('');
+    const dIcon = tieneDeuda ? '<span class="dIcon" title="Apartamento con deuda">D</span>' : '';
+    const vencido = tieneDeuda && diasDesdeEnvio(a) >= recordatorioFrecuenciaDias;
+    const bellHtml = vencido ? '<span title="Toca recordar" style="margin-left:5px;">🔔</span>' : '';
+    const envioHtml = a.ultimo_envio ? '<div class="meta">Último WhatsApp: hace '+Math.floor(diasDesdeEnvio(a))+' día(s)</div>' : '';
+    const alquiladoHtml = a.alquilado ? '<div class="meta" style="color:var(--amber);">🏠 Alquilado'+(a.inquilino_nombre?' · Inquilino: '+esc(a.inquilino_nombre):'')+'</div>' : '';
+    card.innerHTML = '<div class="idrow"><span class="idlabel">'+dIcon+a.id+bellHtml+'</span>'+
+      '<span class="badge '+estadoBadgeClass(a.estado)+'">'+estadoLabel(a.estado)+'</span></div>'+
+      '<div class="owner">'+(a.propietario||'Sin propietario asignado')+'</div>'+
+      '<div class="meta">'+(a.total_m2||'-')+' m² · Cuota mensual $'+(a.cuota_mensual!=null?a.cuota_mensual:'-')+'</div>'+deudaHtml+projDebtHtml+alquiladoHtml+envioHtml;
+    card.onclick = ()=>{ selected={type:'apt', ref:a}; currentTab='editar'; renderSidebar(); buildScene(); };
+
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:6px;margin-top:8px;';
+    const tieneTel = getContactOptions(a).length>0;
+
+    const btnWa = document.createElement('button');
+    btnWa.className = 'btn ghost';
+    btnWa.style.flex = '1';
+    btnWa.textContent = tieneTel ? '💬 WhatsApp' : '💬 Sin teléfono';
+    btnWa.disabled = !tieneTel;
+    btnWa.title = tieneTel ? '' : 'Agrega el teléfono en Editar';
+    btnWa.onclick = (e)=>{
+      e.stopPropagation();
+      sendWhatsAppToApt(a, ()=>fillTemplate(whatsappTemplateGeneral, {nombre:a.propietario||'', id:a.id}), ()=>setTimeout(()=>renderList(body, q), 300));
+    };
+    btnRow.appendChild(btnWa);
+
+    if(tieneDeuda){
+      const btnCobrar = document.createElement('button');
+      btnCobrar.className = 'btn primary';
+      btnCobrar.style.flex = '1';
+      btnCobrar.style.background = '#ef4444';
+      btnCobrar.textContent = tieneTel ? '💰 Cobrar' : '💰 Sin teléfono';
+      btnCobrar.disabled = !tieneTel;
+      btnCobrar.title = projDebts.length ? 'Incluye deuda de condominio y de proyecto(s)' : '';
+      btnCobrar.onclick = (e)=>{
+        e.stopPropagation();
+        sendWhatsAppToApt(a, ()=>buildCobroMessage(a, d, projDebts), ()=>setTimeout(()=>renderList(body, q), 300));
+      };
+      btnRow.appendChild(btnCobrar);
+    }
+    card.appendChild(btnRow);
+    listHost.appendChild(card);
+  });
+}
+
+function renderEditarTab(body){
+  if(!selected){
+    body.innerHTML = '<div class="empty"><div class="big">🏢</div>Selecciona un apartamento, puesto de estacionamiento o maletero en la vista 3D, o desde la pestaña Lista, para ver y editar sus datos.</div>';
+    return;
+  }
+  if(selected.type==='apt') renderEditApt(body, selected.ref);
+  else renderEditSpot(body, selected.ref, selected.type);
+}
+
+function renderEditApt(body, apt){
+  const d = findDeuda(apt);
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `
+    <div class="detail-head">
+      <div class="big-id">${esc(apt.id)}</div>
+      <button class="backbtn" id="btnBack">← Lista</button>
+    </div>
+    <h3 class="section">Datos generales</h3>
+    <div class="form-row"><label>Propietario</label><input id="f_propietario" value="${esc(apt.propietario)}"></div>
+    <div class="form-row"><label>Teléfono (WhatsApp, con código de país)</label><input id="f_telefono" value="${esc(apt.telefono)}" placeholder="Ej: 584121234567"></div>
+    <div class="form-row two">
+      <div><label>Torre</label><input id="f_torre" value="${esc(apt.torre)}" readonly></div>
+      <div><label>Piso</label><input id="f_piso" value="${esc(apt.piso)}" readonly></div>
+    </div>
+    <div class="form-row"><label>Estado</label>
+      <select id="f_estado">
+        <option value="" ${!apt.estado?'selected':''}>Entregado</option>
+        <option value="Vendido sin entregar" ${apt.estado==='Vendido sin entregar'?'selected':''}>Vendido sin entregar</option>
+        <option value="Vendido sin firmar" ${apt.estado==='Vendido sin firmar'?'selected':''}>Vendido sin firmar</option>
+      </select>
+    </div>
+    <h3 class="section">Segundo contacto</h3>
+    <div class="form-row"><label>Nombre</label><input id="f_contacto2_nombre" value="${esc(apt.contacto2_nombre)}"></div>
+    <div class="form-row"><label>Teléfono (WhatsApp)</label><input id="f_contacto2_telefono" value="${esc(apt.contacto2_telefono)}" placeholder="Ej: 584121234567"></div>
+    <h3 class="section">Alquiler</h3>
+    <div class="form-row"><label><input type="checkbox" id="f_alquilado" ${apt.alquilado?'checked':''} style="width:auto;margin-right:6px;vertical-align:middle;">Apartamento alquilado</label></div>
+    <div class="form-row"><label>Nombre del inquilino</label><input id="f_inquilino_nombre" value="${esc(apt.inquilino_nombre)}"></div>
+    <div class="form-row"><label>Teléfono del inquilino</label><input id="f_inquilino_telefono" value="${esc(apt.inquilino_telefono)}" placeholder="Ej: 584121234567"></div>
+    <h3 class="section">Superficies</h3>
+    <div class="form-row two">
+      <div><label>Construcción (m²)</label><input id="f_constr" type="number" step="0.01" value="${apt.construccion!=null?apt.construccion:''}"></div>
+      <div><label>Terraza (m²)</label><input id="f_terraza" type="number" step="0.01" value="${apt.terraza!=null?apt.terraza:''}"></div>
+    </div>
+    <div class="form-row"><label>Total m²</label><input id="f_totalm2" type="number" step="0.01" value="${apt.total_m2!=null?apt.total_m2:''}"></div>
+    <h3 class="section">Alícuota y cuotas</h3>
+    <div class="form-row"><label>Alícuota (%)</label><input id="f_alicuota" type="number" step="0.0001" value="${apt.alicuota!=null?apt.alicuota:''}"></div>
+    <div class="form-row two">
+      <div><label>Cuota anual USD</label><input id="f_cuotaanual" type="number" step="0.01" value="${apt.cuota_anual!=null?apt.cuota_anual:''}"></div>
+      <div><label>Cuota mensual USD</label><input id="f_cuotamensual" type="number" step="0.01" value="${apt.cuota_mensual!=null?apt.cuota_mensual:''}"></div>
+    </div>
+    <h3 class="section">Componentes incluidos</h3>
+    <div class="comp-list">
+      ${apt.componentes.map(c=>'<div class="comp-item"><span class="t">'+c.tipo+'</span><span>'+c.label+'</span></div>').join('')}
+    </div>
+    ${d ? '<h3 class="section" style="margin-top:14px;">Deuda</h3><div class="comp-item" style="color:#ef4444;border-color:#ef4444;"><span class="t">'+(d.meses!=null?d.meses+' meses':'')+'</span><span>$'+(d.monto!=null?d.monto:'-')+'</span></div>' : ''}
+    <div class="savebar">
+      <button class="btn primary" id="btnSave">Guardar cambios</button>
+      <button class="btn ghost" id="btnFly">Ver en 3D</button>
+    </div>
+    <div class="savedFlag" id="savedFlag"></div>
+  `;
+  body.appendChild(wrap);
+  document.getElementById('btnBack').onclick = ()=>{ selected=null; currentTab='lista'; renderSidebar(); buildScene(); };
+  document.getElementById('btnFly').onclick = ()=>{
+    const y = FLOOR_ORDER[apt.piso]*FLOOR_H;
+    const zSign = apt.torre==='A' ? 1 : -1;
+    camTarget.set(0, y+1.5, zSign*4); camRadius=16; camPhi=0.95;
+    updateCamera();
+  };
+  document.getElementById('btnSave').onclick = async ()=>{
+    apt.propietario = document.getElementById('f_propietario').value;
+    apt.telefono = document.getElementById('f_telefono').value.trim() || null;
+    apt.estado = document.getElementById('f_estado').value || null;
+    apt.contacto2_nombre = document.getElementById('f_contacto2_nombre').value.trim() || null;
+    apt.contacto2_telefono = document.getElementById('f_contacto2_telefono').value.trim() || null;
+    apt.alquilado = document.getElementById('f_alquilado').checked;
+    apt.inquilino_nombre = document.getElementById('f_inquilino_nombre').value.trim() || null;
+    apt.inquilino_telefono = document.getElementById('f_inquilino_telefono').value.trim() || null;
+    apt.construccion = parseFloat(document.getElementById('f_constr').value) || null;
+    apt.terraza = parseFloat(document.getElementById('f_terraza').value) || null;
+    apt.total_m2 = parseFloat(document.getElementById('f_totalm2').value) || null;
+    apt.alicuota = parseFloat(document.getElementById('f_alicuota').value) || null;
+    apt.cuota_anual = parseFloat(document.getElementById('f_cuotaanual').value) || null;
+    apt.cuota_mensual = parseFloat(document.getElementById('f_cuotamensual').value) || null;
+    await saveApt(apt);
+    document.getElementById('savedFlag').textContent = '✓ Cambios guardados';
+    buildScene();
+    setTimeout(()=>{ const f=document.getElementById('savedFlag'); if(f) f.textContent=''; }, 2000);
+  };
+}
+
+function renderEditSpot(body, item, type){
+  const label = type==='park' ? ('Puesto de estacionamiento #'+item.numero) : ('Maletero #'+item.numero);
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `
+    <div class="detail-head">
+      <div class="big-id" style="font-size:16px;">${esc(label)}</div>
+      <button class="backbtn" id="btnBack">← Lista</button>
+    </div>
+    <div class="assumption">Distribución: puestos 1-32 → Sótano 1, 33-64 → Sótano 2, 65-78 → Sótano 3. Maleteros ubicados detrás de los puestos en su mismo sótano. Puedes reasignar manualmente si conoces la ubicación real.</div>
+    <h3 class="section">Datos</h3>
+    <div class="form-row"><label>Número</label><input id="f_numero" value="${esc(item.numero)}"></div>
+    <div class="form-row"><label>Sótano</label>
+      <select id="f_sotano">
+        <option value="1" ${String(item.sotano)==='1'?'selected':''}>Sótano 1</option>
+        <option value="2" ${String(item.sotano)==='2'?'selected':''}>Sótano 2</option>
+        <option value="3" ${String(item.sotano)==='3'?'selected':''}>Sótano 3</option>
+      </select>
+    </div>
+    <div class="form-row"><label>m²</label><input id="f_m2" type="number" step="0.01" value="${item.m2!=null?item.m2:''}"></div>
+    <div class="form-row"><label>Alícuota (%)</label><input id="f_alicuota" type="number" step="0.0001" value="${item.alicuota!=null?item.alicuota:''}"></div>
+    <div class="form-row two">
+      <div><label>Cuota anual USD</label><input id="f_cuotaanual" type="number" step="0.01" value="${item.cuota_anual!=null?item.cuota_anual:''}"></div>
+      <div><label>Cuota mensual USD</label><input id="f_cuotamensual" type="number" step="0.01" value="${item.cuota_mensual!=null?item.cuota_mensual:''}"></div>
+    </div>
+    <div class="savebar">
+      <button class="btn primary" id="btnSave">Guardar cambios</button>
+    </div>
+    <div class="savedFlag" id="savedFlag"></div>
+  `;
+  body.appendChild(wrap);
+  document.getElementById('btnBack').onclick = ()=>{ selected=null; currentTab='lista'; renderSidebar(); buildScene(); };
+  document.getElementById('btnSave').onclick = async ()=>{
+    const oldNum = item.numero;
+    item.numero = document.getElementById('f_numero').value;
+    item.sotano = document.getElementById('f_sotano').value;
+    item.m2 = parseFloat(document.getElementById('f_m2').value) || null;
+    item.alicuota = parseFloat(document.getElementById('f_alicuota').value) || null;
+    item.cuota_anual = parseFloat(document.getElementById('f_cuotaanual').value) || null;
+    item.cuota_mensual = parseFloat(document.getElementById('f_cuotamensual').value) || null;
+    if(type==='park') await savePark(item); else await saveMalet(item);
+    document.getElementById('savedFlag').textContent = '✓ Cambios guardados';
+    buildScene();
+    setTimeout(()=>{ const f=document.getElementById('savedFlag'); if(f) f.textContent=''; }, 2000);
+  };
+}
+
+function parseSpanishNumber(s){
+  if(s===undefined || s===null) return null;
+  s = String(s).trim();
+  if(s==='') return null;
+  if(/^-?\d{1,3}(\.\d{3})*(,\d+)?$/.test(s)){ s = s.replace(/\./g,'').replace(',','.'); }
+  else if(/^-?\d{1,3}(,\d{3})*(\.\d+)?$/.test(s)){ s = s.replace(/,/g,''); }
+  else { s = s.replace(',', '.'); }
+  const n = parseFloat(s);
+  return isNaN(n) ? null : n;
+}
+
+function parseDeudaPaste(text){
+  // ojo: no recortar (trim) la línea completa antes de separar columnas — si la primera
+  // celda viene vacía (p.ej. la fila "TOTALES" de Habitacom), el trim se comería esa
+  // celda junto con su tabulador y correría todas las columnas una posición.
+  const lines = text.split(/\r?\n/).filter(l=>l.trim().length);
+  const rows = [];
+  lines.forEach(line=>{
+    // Excel siempre copia con TAB entre columnas; si no hay tab, el separador es ';' (CSV es-ES).
+    // Nunca se parte por ',' porque en formato es-ES la coma es el decimal, no el separador de columna.
+    let parts;
+    if(line.indexOf('\t')>=0) parts = line.split('\t');
+    else if(line.indexOf(';')>=0) parts = line.split(';');
+    else parts = line.split(/\s{2,}/); // fallback: espacios multiples
+    if(parts.length<2) return;
+    const id = (parts[0]||'').trim();
+    const propietario = (parts[1]||'').trim();
+    const meses = parseSpanishNumber(parts[2]);
+    const monto = parseSpanishNumber(parts[3]);
+    if(!id) return;
+    if(meses===null && monto===null) return; // fila de encabezado (ej. "Unidad Propietario Recibos Deuda")
+    if(/^total/i.test(propietario)) return; // fila de totales
+    rows.push({id, propietario, meses, monto});
+  });
+  return rows;
+}
+
+async function saveDeuda(){
+  try{ await window.storage.set('deuda_table', JSON.stringify(deudaRows)); }catch(e){}
+  pushDeudaSnapshot();
+  try{ await window.storage.set('deuda_historial', JSON.stringify(deudaHistorial)); }catch(e){}
+  saveFullSnapshot();
+}
+// guarda una "foto" de la deuda cada vez que se actualiza la tabla, para poder ver
+// la evolución en el tiempo (qué apartamentos aparecen o permanecen, y el total)
+function pushDeudaSnapshot(){
+  const total = deudaRows.reduce((s,r)=>s+(r.monto||0),0);
+  const apartamentos = deudaRows.map(r=>({id:r.id, propietario:r.propietario||'', meses:r.meses!=null?r.meses:null, monto:r.monto||0}));
+  deudaHistorial.push({fecha:new Date().toISOString(), total, apartamentos});
+}
+
+function renderDeudaTab(body){
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `
+    <h3 class="section">Adjuntar archivo de deuda</h3>
+    <div class="assumption">Columnas esperadas: ID apto, Propietario, Meses, Monto. Acepta .xlsx, .xls o .csv. También puedes copiar la tabla "Recibos Pendientes" de tu portal Habitacom (Unidad, Propietario, Recibos, Deuda) y pegarla abajo tal cual — se reconoce el mismo orden de columnas y el formato de monto en español (ej. 1.679,35). Se busca coincidencia por ID de apartamento.</div>
+    <input type="file" id="deudaFile" accept=".xlsx,.xls,.csv" style="width:100%;padding:8px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;">
+    <div class="savedFlag" id="savedFlagDeuda"></div>
+    <details style="margin-top:10px;">
+      <summary style="cursor:pointer;font-size:12px;color:var(--sub);">O pegar manualmente</summary>
+      <textarea id="deudaPaste" placeholder="Pega aquí desde Excel..." style="width:100%;min-height:90px;margin-top:8px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:9px;font-size:12px;font-family:monospace;"></textarea>
+      <button class="btn primary" id="btnProcesar" style="margin-top:8px;width:100%;">Procesar texto pegado</button>
+    </details>
+    <div class="savebar" style="margin-top:10px;">
+      <button class="btn ghost" id="btnLimpiarDeuda">Limpiar tabla</button>
+    </div>
+    <h3 class="section" style="margin-top:16px;">Tabla actual (${deudaRows.length})</h3>
+    <div id="deudaTableHost"></div>
+  `;
+  body.appendChild(wrap);
+
+  function renderTable(){
+    const host = document.getElementById('deudaTableHost');
+    if(deudaRows.length===0){ host.innerHTML = '<div class="empty">Sin datos de deuda cargados.</div>'; return; }
+    let rowsHtml = deudaRows.map(r=>{
+      const match = apartments.find(a=>normalizeId(a.id)===normalizeId(r.id));
+      const okBadge = match ? '<span class="badge entregado">OK</span>' : '<span class="badge sinfirmar">sin match</span>';
+      return '<div class="comp-item"><span class="t">'+esc(r.id)+' · '+esc(r.propietario||'')+'</span><span>'+(r.meses!=null?r.meses+'m · ':'')+'$'+(r.monto!=null?r.monto:'-')+' '+okBadge+'</span></div>';
+    }).join('');
+    host.innerHTML = '<div class="comp-list">'+rowsHtml+'</div>';
+  }
+  renderTable();
+
+  async function applyRows(parsed, flagEl){
+    if(parsed.length===0){ flagEl.textContent='No se detectaron filas válidas.'; return; }
+    deudaRows = parsed;
+    await saveDeuda();
+    flagEl.textContent = '✓ '+parsed.length+' filas guardadas';
+    renderTable();
+    setTimeout(()=>{ if(flagEl) flagEl.textContent=''; }, 2500);
+  }
+
+  document.getElementById('deudaFile').onchange = async (e)=>{
+    const file = e.target.files[0];
+    const flagEl = document.getElementById('savedFlagDeuda');
+    if(!file) return;
+    flagEl.textContent = 'Leyendo archivo...';
+    try{
+      const name = file.name.toLowerCase();
+      if(name.endsWith('.csv')){
+        const text = await file.text();
+        await applyRows(parseDeudaPaste(text), flagEl);
+      } else {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, {type:'array'});
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows2d = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true});
+        const parsed = [];
+        rows2d.forEach(r=>{
+          if(!r || !r[0]) return;
+          const id = String(r[0]).trim();
+          const propietario = r[1]!==undefined ? String(r[1]).trim() : '';
+          const meses = r[2]!==undefined ? parseSpanishNumber(r[2]) : null;
+          const monto = r[3]!==undefined ? parseSpanishNumber(r[3]) : null;
+          if(id) parsed.push({id, propietario, meses, monto});
+        });
+        await applyRows(parsed, flagEl);
+      }
+    }catch(err){
+      flagEl.textContent = 'Error al leer el archivo.';
+      console.error(err);
+    }
+    e.target.value = '';
+  };
+
+  document.getElementById('btnProcesar').onclick = async ()=>{
+    const text = document.getElementById('deudaPaste').value;
+    await applyRows(parseDeudaPaste(text), document.getElementById('savedFlagDeuda'));
+  };
+  document.getElementById('btnLimpiarDeuda').onclick = async ()=>{
+    if(!confirm('¿Borrar la tabla de deuda cargada?')) return;
+    deudaRows = [];
+    await saveDeuda();
+    renderTable();
+  };
+}
+
+// ---------- proyectos especiales ----------
+function proyectoRepartoAporte(proyecto, apt){
+  if(proyecto.reparto==='igual'){
+    return proyecto.presupuesto_total / (apartments.length||1);
+  }
+  const sumaAlicuotas = apartments.reduce((s,a)=>s+(a.alicuota||0),0) || 1;
+  return proyecto.presupuesto_total * ((apt.alicuota||0)/sumaAlicuotas);
+}
+
+function buildAportes(proyecto){
+  proyecto.aportes = apartments.map(a=>{
+    const existing = (proyecto.aportes||[]).find(x=>x.apt_id===a.id);
+    return {
+      apt_id: a.id,
+      monto_aporte: existing ? existing.monto_aporte : Math.round(proyectoRepartoAporte(proyecto, a)*100)/100,
+      monto_pagado: existing ? (existing.monto_pagado||0) : 0,
+      historial: existing ? (existing.historial||[]) : []
+    };
+  });
+}
+
+function renderProyectosTab(body){
+  if(selectedProyectoId){
+    const p = proyectos.find(x=>x.id===selectedProyectoId);
+    if(p){ renderProyectoDetalle(body, p); return; }
+    selectedProyectoId = null;
+  }
+  const wrap = document.createElement('div');
+  const rows = proyectos.map(p=>{
+    const recaudado = (p.aportes||[]).reduce((s,a)=>s+(a.monto_pagado||0),0);
+    const pct = p.presupuesto_total ? Math.min(100, Math.round(recaudado/p.presupuesto_total*100)) : 0;
+    return '<div class="card" data-id="'+esc(p.id)+'">'+
+      '<div class="idrow"><span class="idlabel">'+esc(p.nombre)+'</span><span class="badge" style="background:rgba(59,130,246,.18);color:#3b82f6;">'+pct+'%</span></div>'+
+      '<div class="meta">'+esc(p.descripcion||'')+'</div>'+
+      '<div class="meta">Recaudado $'+recaudado.toLocaleString(undefined,{maximumFractionDigits:2})+' de $'+(p.presupuesto_total||0).toLocaleString()+'</div>'+
+    '</div>';
+  }).join('');
+  wrap.innerHTML = `
+    <h3 class="section">Proyectos especiales</h3>
+    <div class="assumption">Ej: pozo de agua, impermeabilización, etc. El aporte por apartamento se calcula según alícuota o partes iguales, y puedes registrar abonos individuales; al registrar un abono se abre WhatsApp con el aviso listo para el copropietario.</div>
+    <div id="proyectosList">${rows || '<div class="empty">Sin proyectos creados aún.</div>'}</div>
+    <h3 class="section" style="margin-top:16px;">Nuevo proyecto</h3>
+    <div class="form-row"><label>Nombre</label><input id="np_nombre" placeholder="Ej: Pozo de agua"></div>
+    <div class="form-row"><label>Descripción</label><input id="np_desc" placeholder="Breve descripción"></div>
+    <div class="form-row two">
+      <div><label>Presupuesto total (USD)</label><input id="np_presupuesto" type="number" step="0.01"></div>
+      <div><label>Reparto</label>
+        <select id="np_reparto">
+          <option value="alicuota">Por alícuota</option>
+          <option value="igual">Partes iguales</option>
+        </select>
+      </div>
+    </div>
+    <div class="savebar"><button class="btn primary" id="btnNuevoProyecto" style="flex:1;">Crear proyecto</button></div>
+  `;
+  body.appendChild(wrap);
+  wrap.querySelectorAll('#proyectosList .card').forEach(card=>{
+    card.onclick = ()=>{ selectedProyectoId = card.dataset.id; renderSidebar(); };
+  });
+  document.getElementById('btnNuevoProyecto').onclick = async ()=>{
+    const nombre = document.getElementById('np_nombre').value.trim();
+    const presupuesto = parseFloat(document.getElementById('np_presupuesto').value) || 0;
+    if(!nombre || presupuesto<=0){ alert('Ingresa nombre y presupuesto válido.'); return; }
+    const p = {
+      id: 'proy_'+Date.now(),
+      nombre,
+      descripcion: document.getElementById('np_desc').value.trim(),
+      presupuesto_total: presupuesto,
+      reparto: document.getElementById('np_reparto').value,
+      creado: new Date().toISOString(),
+      aportes: []
+    };
+    buildAportes(p);
+    proyectos.push(p);
+    await saveProyectos();
+    renderSidebar();
+  };
+}
+
+function renderProyectoDetalle(body, p){
+  const recaudado = (p.aportes||[]).reduce((s,a)=>s+(a.monto_pagado||0),0);
+  const pct = p.presupuesto_total ? Math.min(100, Math.round(recaudado/p.presupuesto_total*100)) : 0;
+  const wrap = document.createElement('div');
+  const filasHtml = (p.aportes||[]).map(ap=>{
+    const apt = apartments.find(a=>a.id===ap.apt_id);
+    const pendiente = Math.max(0, (ap.monto_aporte||0) - (ap.monto_pagado||0));
+    const badge = pendiente<=0.005 ? '<span class="badge entregado">Al día</span>' : '<span class="badge sinentregar">Pendiente</span>';
+    const historial = (ap.historial||[]).slice().reverse();
+    const historialHtml = historial.length
+      ? historial.map(h=>{
+          const fecha = new Date(h.fecha).toLocaleDateString('es-VE',{day:'2-digit',month:'short',year:'numeric'});
+          return '<div class="comp-item" style="padding-left:14px;"><span class="t">'+fecha+' · '+esc(h.forma_pago||'No especificado')+'</span><span>$'+(h.monto||0).toFixed(2)+'</span></div>';
+        }).join('')
+      : '<div class="empty" style="padding:8px 0;">Sin pagos registrados.</div>';
+    return '<details>'
+      +'<summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:7px 9px;background:var(--panel2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:12px;margin-bottom:2px;">'
+      +'<span class="t">'+esc(ap.apt_id)+' · '+esc(apt?apt.propietario:'')+'</span>'
+      +'<span>$'+(ap.monto_pagado||0).toFixed(2)+' / $'+(ap.monto_aporte||0).toFixed(2)+' '+badge+'</span>'
+      +'</summary>'+historialHtml+'</details>';
+  }).join('');
+  const opciones = (p.aportes||[]).map(ap=>'<option value="'+esc(ap.apt_id)+'">'+esc(ap.apt_id)+'</option>').join('');
+  wrap.innerHTML = `
+    <div class="detail-head">
+      <div class="big-id" style="font-size:16px;">${esc(p.nombre)}</div>
+      <button class="backbtn" id="btnBackProy">← Proyectos</button>
+    </div>
+    <div class="assumption">${esc(p.descripcion||'')}</div>
+    <div class="statline"><span>Presupuesto</span><b>$${(p.presupuesto_total||0).toLocaleString()}</b></div>
+    <div class="statline"><span>Recaudado</span><b style="color:#10b981">$${recaudado.toLocaleString(undefined,{maximumFractionDigits:2})} (${pct}%)</b></div>
+    <h3 class="section" style="margin-top:14px;">Registrar abono</h3>
+    <div class="form-row"><label>Apartamento</label><select id="ab_apt">${opciones}</select></div>
+    <div class="form-row two">
+      <div><label>Monto abonado (USD)</label><input id="ab_monto" type="number" step="0.01"></div>
+      <div><label>Forma de pago</label>
+        <select id="ab_forma">
+          <option value="Transferencia">Transferencia</option>
+          <option value="Efectivo">Efectivo</option>
+        </select>
+      </div>
+    </div>
+    <div class="savebar"><button class="btn primary" id="btnAbonar" style="flex:1;">Registrar y avisar por WhatsApp</button></div>
+    <div class="savedFlag" id="savedFlagProy"></div>
+    <h3 class="section" style="margin-top:16px;">Cargar pagos existentes (en lote)</h3>
+    <div class="assumption">Para pagos ya realizados antes de usar esta app (no envía WhatsApp). Pega "ID [TAB] Monto pagado a la fecha" o, si el aporte real de cada apartamento no es el reparto automático, "ID [TAB] Aporte total [TAB] Monto pagado [TAB] Forma de pago (opcional)" para fijar ambos valores exactos y, si quieres, dejar registrada la forma de pago.</div>
+    <textarea id="abonosPaste" placeholder="A3-6	500.05" style="width:100%;min-height:80px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:9px;font-size:12px;font-family:monospace;"></textarea>
+    <div class="savebar" style="margin-top:8px;"><button class="btn ghost" id="btnCargarAbonos" style="flex:1;">Cargar pagos (sobrescribe el monto pagado)</button></div>
+    <div class="savedFlag" id="flagAbonosLote"></div>
+    <h3 class="section" style="margin-top:16px;">Aportes por apartamento (${(p.aportes||[]).length})</h3>
+    <div class="comp-list">${filasHtml || '<div class="empty">Sin aportes calculados.</div>'}</div>
+  `;
+  body.appendChild(wrap);
+  document.getElementById('btnBackProy').onclick = ()=>{ selectedProyectoId=null; renderSidebar(); };
+  document.getElementById('btnAbonar').onclick = async ()=>{
+    const aptId = document.getElementById('ab_apt').value;
+    const monto = parseFloat(document.getElementById('ab_monto').value);
+    const formaPago = document.getElementById('ab_forma').value;
+    const flag = document.getElementById('savedFlagProy');
+    if(!monto || monto<=0){ flag.textContent='Ingresa un monto válido.'; return; }
+    const ap = (p.aportes||[]).find(x=>x.apt_id===aptId);
+    if(!ap){ flag.textContent='Apartamento no encontrado en este proyecto.'; return; }
+    ap.monto_pagado = (ap.monto_pagado||0) + monto;
+    ap.historial = ap.historial||[];
+    ap.historial.push({monto, fecha:new Date().toISOString(), forma_pago:formaPago});
+    await saveProyectos();
+    const apt = apartments.find(a=>a.id===aptId);
+    const pendiente = Math.max(0, (ap.monto_aporte||0) - (ap.monto_pagado||0));
+    const msg = ()=>'Hola '+(apt?apt.propietario:'')+', se registró un abono de $'+monto.toFixed(2)+' ('+formaPago+') para el proyecto "'+p.nombre+'" en el apartamento '+aptId+'. Tu saldo pendiente en este proyecto es $'+pendiente.toFixed(2)+'. -- Junta de Condominio Hatillo Hill';
+    const tieneTel = apt && getContactOptions(apt).length>0;
+    if(tieneTel) sendWhatsAppToApt(apt, msg);
+    flag.textContent = tieneTel ? '✓ Abono registrado, abriendo WhatsApp...' : '✓ Abono registrado (sin teléfono para avisar; agrégalo en Editar)';
+    renderSidebar();
+  };
+  document.getElementById('btnCargarAbonos').onclick = async ()=>{
+    const flag = document.getElementById('flagAbonosLote');
+    const lines = document.getElementById('abonosPaste').value.split(/\r?\n/).filter(l=>l.trim().length);
+    let actualizados=0; const sinMatch=[];
+    lines.forEach(line=>{
+      let parts;
+      if(line.indexOf('\t')>=0) parts = line.split('\t');
+      else if(line.indexOf(';')>=0) parts = line.split(';');
+      else parts = line.split(/\s{2,}/);
+      if(parts.length<2) return;
+      const id = (parts[0]||'').trim();
+      if(!id) return;
+      const ap = (p.aportes||[]).find(x=>normalizeId(x.apt_id)===normalizeId(id));
+      if(!ap){ sinMatch.push(id); return; }
+      let monto, formaPago = null;
+      if(parts.length>=3){
+        const aporte = parseSpanishNumber(parts[1]);
+        monto = parseSpanishNumber(parts[2]);
+        if(aporte===null || monto===null) return;
+        ap.monto_aporte = aporte;
+        if(parts.length>=4 && parts[3].trim()) formaPago = parts[3].trim();
+      } else {
+        monto = parseSpanishNumber(parts[1]);
+        if(monto===null) return;
+      }
+      ap.monto_pagado = monto;
+      ap.historial = ap.historial||[];
+      ap.historial.push({monto, fecha:new Date().toISOString(), forma_pago:formaPago, nota:'carga en lote'});
+      actualizados++;
+    });
+    await saveProyectos();
+    flag.textContent = '✓ '+actualizados+' aporte(s) actualizado(s)'+(sinMatch.length? ' · sin coincidencia: '+sinMatch.join(', ') : '');
+    document.getElementById('abonosPaste').value = '';
+    setTimeout(()=>{ renderSidebar(); }, 1800);
+  };
+}
+
+// ---------- carga masiva de teléfonos / propietario ----------
+function parseTelefonoPaste(text){
+  const lines = text.split(/\r?\n/).filter(l=>l.trim().length);
+  const rows = [];
+  lines.forEach(line=>{
+    let parts;
+    if(line.indexOf('\t')>=0) parts = line.split('\t');
+    else if(line.indexOf(';')>=0) parts = line.split(';');
+    else parts = line.split(/\s{2,}/);
+    if(parts.length<2) return;
+    const id = (parts[0]||'').trim();
+    if(!id) return;
+    if(parts.length>=3){
+      rows.push({id, propietario:(parts[1]||'').trim(), telefono:(parts[2]||'').trim()});
+    } else {
+      rows.push({id, telefono:(parts[1]||'').trim()});
+    }
+  });
+  return rows;
+}
+
+
+function renderResumenTab(body){
+  const totalApts = apartments.length;
+  const entregados = apartments.filter(a=>!a.estado).length;
+  const sinEntregar = apartments.filter(a=>a.estado==='Vendido sin entregar').length;
+  const sinFirmar = apartments.filter(a=>a.estado==='Vendido sin firmar').length;
+  const sumaCuotaAnual = apartments.reduce((s,a)=>s+(a.cuota_anual||0),0);
+  const sumaAlicuota = apartments.reduce((s,a)=>s+(a.alicuota||0),0);
+  const deudaTotal = deudaRows.reduce((s,r)=>s+(r.monto||0),0);
+  const aptsConDeuda = apartments.filter(a=>findDeuda(a)).length;
+  const proyectosRecaudado = proyectos.reduce((s,p)=>s+(p.aportes||[]).reduce((s2,a)=>s2+(a.monto_pagado||0),0),0);
+  const proyectosPresupuesto = proyectos.reduce((s,p)=>s+(p.presupuesto_total||0),0);
+
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `
+    <h3 class="section">Condominio</h3>
+    <div class="statline"><span>Nombre</span><b>${esc(RAW_DATA.condominio)}</b></div>
+    <div class="statline"><span>Presupuesto anual estimado</span><b>$${RAW_DATA.presupuesto_estimado_anual.toLocaleString()}</b></div>
+    <h3 class="section" style="margin-top:14px;">Apartamentos</h3>
+    <div class="statline"><span>Total</span><b>${totalApts}</b></div>
+    <div class="statline"><span>Entregados</span><b style="color:#10b981">${entregados}</b></div>
+    <div class="statline"><span>Vendidos sin entregar</span><b style="color:#f59e0b">${sinEntregar}</b></div>
+    <div class="statline"><span>Vendidos sin firmar</span><b style="color:#ef4444">${sinFirmar}</b></div>
+    <h3 class="section" style="margin-top:14px;">Deuda</h3>
+    <div class="statline"><span>Apartamentos con deuda</span><b style="color:#ef4444">${aptsConDeuda}</b></div>
+    <div class="statline"><span>Deuda total</span><b style="color:#ef4444">$${deudaTotal.toLocaleString(undefined,{maximumFractionDigits:2})}</b></div>
+    <h3 class="section" style="margin-top:14px;">Alícuotas</h3>
+    <div class="statline"><span>Suma alícuotas apartamentos</span><b>${(sumaAlicuota*100).toFixed(2)}%</b></div>
+    <div class="statline"><span>Suma cuota anual apartamentos</span><b>$${sumaCuotaAnual.toLocaleString(undefined,{maximumFractionDigits:0})}</b></div>
+    <h3 class="section" style="margin-top:14px;">Proyectos especiales</h3>
+    <div class="statline"><span>Proyectos activos</span><b>${proyectos.length}</b></div>
+    <div class="statline"><span>Recaudado / presupuestado</span><b>$${proyectosRecaudado.toLocaleString(undefined,{maximumFractionDigits:2})} / $${proyectosPresupuesto.toLocaleString()}</b></div>
+    <h3 class="section" style="margin-top:14px;">Sótanos</h3>
+    <div class="statline"><span>Puestos de estacionamiento independientes</span><b>${parking.length}</b></div>
+    <div class="statline"><span>Maleteros independientes</span><b>${maleteros.length}</b></div>
+    <div class="assumption" style="margin-top:14px;">Los pisos, torres y agrupación en sótanos de estacionamientos/maleteros independientes se representan de forma ilustrativa para navegación 3D; los valores de alícuotas y cuotas provienen del archivo original (hoja "ALICUOTAS 2025-2026").</div>
+  `;
+  body.appendChild(wrap);
+}
+
+// ---------- dashboard ----------
+function fmtMoney(n){ return '$'+(n||0).toLocaleString(undefined,{maximumFractionDigits:2}); }
+
+function widgetTopDeudaCondominio(){
+  const rows = deudaRows.slice().sort((a,b)=>(b.monto||0)-(a.monto||0)).slice(0,10);
+  const max = rows.length ? (rows[0].monto||0) : 0;
+  const body = rows.length ? rows.map((r,i)=>{
+    const pct = max>0 ? Math.round((r.monto||0)/max*100) : 0;
+    return '<div class="dashRow"><span class="dashRank">'+(i+1)+'</span><span class="dashId">'+esc(r.id)+'</span>'+
+      '<span class="dashOwner">'+esc(r.propietario||'')+'</span><span class="dashVal" style="color:#ef4444;">'+fmtMoney(r.monto)+'</span></div>'+
+      '<div class="dashBarWrap"><div class="dashBar" style="width:'+pct+'%;background:#ef4444;"></div></div>';
+  }).join('') : '<div class="dashEmpty">Sin datos de deuda cargados.</div>';
+  return '<div class="dashWidget"><h3>Top 10 · Deuda condominio ($)</h3>'+body+'</div>';
+}
+
+function widgetTopRecibosVencidos(){
+  const rows = deudaRows.slice().sort((a,b)=>(b.meses||0)-(a.meses||0)).slice(0,10);
+  const max = rows.length ? (rows[0].meses||0) : 0;
+  const body = rows.length ? rows.map((r,i)=>{
+    const pct = max>0 ? Math.round((r.meses||0)/max*100) : 0;
+    return '<div class="dashRow"><span class="dashRank">'+(i+1)+'</span><span class="dashId">'+esc(r.id)+'</span>'+
+      '<span class="dashOwner">'+esc(r.propietario||'')+'</span><span class="dashVal" style="color:#f59e0b;">'+(r.meses!=null?r.meses:'-')+' recibo(s)</span></div>'+
+      '<div class="dashBarWrap"><div class="dashBar" style="width:'+pct+'%;background:#f59e0b;"></div></div>';
+  }).join('') : '<div class="dashEmpty">Sin datos de deuda cargados.</div>';
+  return '<div class="dashWidget"><h3>Top 10 · Recibos vencidos (condominio)</h3>'+body+'</div>';
+}
+
+function widgetEnvejecimiento(){
+  const buckets = [
+    {label:'1-3 meses', min:1, max:3, count:0, monto:0, color:'#f59e0b', items:[]},
+    {label:'4-6 meses', min:4, max:6, count:0, monto:0, color:'#fb923c', items:[]},
+    {label:'7-12 meses', min:7, max:12, count:0, monto:0, color:'#ef4444', items:[]},
+    {label:'+12 meses', min:13, max:Infinity, count:0, monto:0, color:'#b91c1c', items:[]}
+  ];
+  deudaRows.forEach(r=>{
+    const m = r.meses||0;
+    const b = buckets.find(bk=>m>=bk.min && m<=bk.max);
+    if(b){ b.count++; b.monto += (r.monto||0); b.items.push(r); }
+  });
+  const maxCount = Math.max(1, ...buckets.map(b=>b.count));
+  const body = buckets.map(b=>{
+    const pct = Math.round(b.count/maxCount*100);
+    const itemsHtml = b.items.length
+      ? b.items.slice().sort((x,y)=>(y.monto||0)-(x.monto||0)).map(r=>
+          '<div class="dashRow" style="padding-left:14px;"><span class="dashId">'+esc(r.id)+'</span><span class="dashOwner">'+esc(r.propietario||'')+'</span><span class="dashVal" style="color:'+b.color+';">'+fmtMoney(r.monto)+'</span></div>'
+        ).join('')
+      : '<div class="dashEmpty">Sin apartamentos en este rango.</div>';
+    return '<details><summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px dashed var(--border);color:var(--text);font-size:12.5px;">'+
+      '<span class="dashId">'+b.label+'</span><span class="dashOwner" style="text-align:right;">'+b.count+' apto(s)</span>'+
+      '<span class="dashVal" style="color:'+b.color+';">'+fmtMoney(b.monto)+'</span></summary>'+
+      '<div class="dashBarWrap" style="margin:4px 0 6px;"><div class="dashBar" style="width:'+pct+'%;background:'+b.color+';"></div></div>'+
+      itemsHtml+
+    '</details>';
+  }).join('');
+  return '<div class="dashWidget"><h3>Envejecimiento de deuda (condominio) · toca un rango para ver los apartamentos</h3>'+body+'</div>';
+}
+
+function widgetSinTelefono(){
+  const sinTel = apartments.filter(a=>!toWhatsAppNumber(a.telefono));
+  const body = sinTel.length ? sinTel.map(a=>
+    '<div class="dashRow"><span class="dashId">'+esc(a.id)+'</span><span class="dashOwner">'+esc(a.propietario||'Sin propietario')+'</span></div>'
+  ).join('') : '<div class="dashEmpty">Todos los apartamentos tienen teléfono registrado.</div>';
+  return '<div class="dashWidget"><h3>Sin teléfono registrado ('+sinTel.length+')</h3>'+body+'</div>';
+}
+
+function widgetPareto80(){
+  const totalDebt = deudaRows.reduce((s,r)=>s+(r.monto||0),0);
+  const sorted = deudaRows.slice().sort((a,b)=>(b.monto||0)-(a.monto||0));
+  let acc=0; const pareto=[];
+  for(const r of sorted){
+    pareto.push(r);
+    acc += (r.monto||0);
+    if(totalDebt>0 && acc >= totalDebt*0.8) break;
+  }
+  const pct = totalDebt>0 ? Math.round(acc/totalDebt*100) : 0;
+  const body = pareto.length ? pareto.map((r,i)=>
+    '<div class="dashRow"><span class="dashRank">'+(i+1)+'</span><span class="dashId">'+esc(r.id)+'</span>'+
+    '<span class="dashOwner">'+esc(r.propietario||'')+'</span><span class="dashVal" style="color:#ef4444;">'+fmtMoney(r.monto)+'</span></div>'
+  ).join('') : '<div class="dashEmpty">Sin datos de deuda cargados.</div>';
+  const nota = pareto.length ? '<div class="assumption" style="margin-top:8px;">Estos '+pareto.length+' apartamento(s) concentran $'+acc.toLocaleString(undefined,{maximumFractionDigits:2})+' ('+pct+'% de la deuda total del condominio). Priorizar cobranza aquí.</div>' : '';
+  return '<div class="dashWidget" style="grid-column:1/-1;"><h3>Concentración de deuda (Pareto 80%)</h3>'+body+nota+'</div>';
+}
+
+function fmtMoneyShort(n){
+  n = n||0;
+  if(Math.abs(n)>=1000) return '$'+(n/1000).toFixed(1)+'K';
+  return '$'+Math.round(n);
+}
+// grafica de linea con la evolucion del total de deuda a lo largo de las actualizaciones
+function widgetHistoricoDeudaTotal(){
+  const snaps = deudaHistorial.slice(-12);
+  if(!snaps.length){
+    return '<div class="dashWidget"><h3>Histórico de deuda total</h3><div class="dashEmpty">Aún no hay histórico — se genera cada vez que actualizas la tabla de deuda.</div></div>';
+  }
+  const W = 460, H = 150, PAD_L = 44, PAD_R = 14, PAD_T = 16, PAD_B = 22;
+  const plotW = W-PAD_L-PAD_R, plotH = H-PAD_T-PAD_B;
+  const vals = snaps.map(s=>s.total);
+  const maxV = Math.max(...vals, 1);
+  const minV = Math.min(0, Math.min(...vals));
+  const range = (maxV-minV)||1;
+  const xOf = i => PAD_L + (snaps.length===1 ? plotW/2 : (i/(snaps.length-1))*plotW);
+  const yOf = v => PAD_T + plotH - ((v-minV)/range)*plotH;
+  const pts = snaps.map((s,i)=>({x:xOf(i), y:yOf(s.total), s}));
+  const linePath = pts.map((p,i)=>(i===0?'M':'L')+p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
+  const baseY = (PAD_T+plotH).toFixed(1);
+  const areaPath = linePath+' L'+pts[pts.length-1].x.toFixed(1)+','+baseY+' L'+pts[0].x.toFixed(1)+','+baseY+' Z';
+  const fechaCorta = iso => new Date(iso).toLocaleDateString('es-VE',{day:'2-digit',month:'short'});
+  const gridLines = [0,0.5,1].map(f=>{
+    const val = minV+(maxV-minV)*f, yy = yOf(val);
+    return '<line x1="'+PAD_L+'" x2="'+(W-PAD_R)+'" y1="'+yy.toFixed(1)+'" y2="'+yy.toFixed(1)+'" stroke="var(--border)" stroke-width="1"/>'
+      +'<text x="'+(PAD_L-6)+'" y="'+(yy+3).toFixed(1)+'" text-anchor="end" font-size="9" fill="var(--sub)">'+fmtMoneyShort(val)+'</text>';
+  }).join('');
+  const showLabel = new Set([0, pts.length-1]);
+  if(pts.length>2) showLabel.add(Math.floor((pts.length-1)/2));
+  const dateLabels = pts.map((p,i)=> showLabel.has(i) ? '<text x="'+p.x.toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" font-size="9" fill="var(--sub)">'+fechaCorta(p.s.fecha)+'</text>' : '').join('');
+  const dots = pts.map(p=>'<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="3.5" fill="#ef4444"><title>'+fechaCorta(p.s.fecha)+': '+fmtMoney(p.s.total)+' ('+p.s.apartamentos.length+' apto(s))</title></circle>').join('');
+  const last = pts[pts.length-1];
+  const lastLabel = '<text x="'+last.x.toFixed(1)+'" y="'+(last.y-9).toFixed(1)+'" text-anchor="end" font-size="11" font-weight="700" fill="#ef4444">'+fmtMoney(vals[vals.length-1])+'</text>';
+  const svg = '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:'+H+'px;overflow:visible;display:block;">'
+    +gridLines
+    +'<path d="'+areaPath+'" fill="#ef4444" fill-opacity="0.12" stroke="none"/>'
+    +'<path d="'+linePath+'" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+    +dots+dateLabels+lastLabel
+    +'</svg>';
+  return '<div class="dashWidget"><h3>Histórico de deuda total ('+snaps.length+' actualizaciones)</h3>'+svg+'</div>';
+}
+// compara la ultima actualizacion de deuda contra la anterior y lista, apartamento por
+// apartamento, quien entro/salio de deuda o le subio/bajo el numero de recibos o el monto
+function widgetMovimientosDeuda(){
+  if(deudaHistorial.length < 2){
+    return '<div class="dashWidget" style="grid-column:1/-1;"><h3>Movimientos de deuda</h3><div class="dashEmpty">Se necesitan al menos 2 actualizaciones de la tabla de deuda para comparar cambios.</div></div>';
+  }
+  const curr = deudaHistorial[deudaHistorial.length-1];
+  const prev = deudaHistorial[deudaHistorial.length-2];
+  const prevMap = {}; prev.apartamentos.forEach(a=>{ prevMap[a.id]=a; });
+  const currMap = {}; curr.apartamentos.forEach(a=>{ currMap[a.id]=a; });
+  const ids = Array.from(new Set([...Object.keys(prevMap), ...Object.keys(currMap)])).sort();
+  const nuevos=[], subieron=[], bajaron=[], salieron=[];
+  ids.forEach(id=>{
+    const b = prevMap[id], a = currMap[id];
+    const nombre = (a&&a.propietario) || (b&&b.propietario) || '';
+    if(!b && a){ nuevos.push({id,nombre,meses:a.meses,monto:a.monto}); return; }
+    if(b && !a){ salieron.push({id,nombre,meses:b.meses,monto:b.monto}); return; }
+    const mb=b.meses, ma=a.meses;
+    const item = {id,nombre,mesesB:mb,mesesA:ma,montoB:b.monto,montoA:a.monto};
+    if(mb!=null && ma!=null){
+      if(ma>mb) subieron.push(item);
+      else if(ma<mb) bajaron.push(item);
+    } else {
+      if((a.monto||0) > (b.monto||0)+0.005) subieron.push(item);
+      else if((a.monto||0) < (b.monto||0)-0.005) bajaron.push(item);
+    }
+  });
+  const rowSimple = (m,color,label)=>'<div class="dashRow"><span class="dashId">'+esc(m.id)+'</span><span class="dashOwner">'+esc(m.nombre)+'</span>'+
+    '<span class="dashVal" style="color:'+color+';">'+label+' · '+fmtMoney(m.monto)+(m.meses!=null?' ('+m.meses+' recibo(s))':'')+'</span></div>';
+  const rowChange = (m,color)=>{
+    const txt = (m.mesesA!=null && m.mesesB!=null) ? (m.mesesB+' → '+m.mesesA+' recibo(s)') : (fmtMoney(m.montoB)+' → '+fmtMoney(m.montoA));
+    return '<div class="dashRow"><span class="dashId">'+esc(m.id)+'</span><span class="dashOwner">'+esc(m.nombre)+'</span><span class="dashVal" style="color:'+color+';">'+txt+'</span></div>';
+  };
+  const section = (title, items, renderFn)=> items.length ? ('<div style="font-size:11px;font-weight:700;color:var(--text);margin:10px 0 2px;">'+title+' ('+items.length+')</div>'+items.map(renderFn).join('')) : '';
+  const body = section('🆕 Nuevos en deuda', nuevos, m=>rowSimple(m,'#ef4444','Nuevo'))
+    + section('🔺 Aumentó', subieron, m=>rowChange(m,'#f59e0b'))
+    + section('🔻 Disminuyó', bajaron, m=>rowChange(m,'#10b981'))
+    + section('✅ Salió de deuda', salieron, m=>rowSimple(m,'#10b981','Pagó'));
+  const fecha = new Date(curr.fecha).toLocaleDateString('es-VE',{day:'2-digit',month:'short',year:'numeric'});
+  return '<div class="dashWidget" style="grid-column:1/-1;"><h3>Movimientos de deuda · actualización del '+fecha+'</h3>'+(body || '<div class="dashEmpty">No hubo cambios respecto a la actualización anterior.</div>')+'</div>';
+}
+
+function renderDashboard(){
+  const body = document.getElementById('dashboardBody');
+  body.innerHTML = widgetTopDeudaCondominio() + widgetTopRecibosVencidos() + widgetEnvejecimiento() + widgetSinTelefono() + widgetPareto80() + widgetHistoricoDeudaTotal() + widgetMovimientosDeuda();
+}
+document.getElementById('btnOpenDashboard').addEventListener('click', ()=>{
+  renderDashboard();
+  document.getElementById('dashboardModal').classList.add('open');
+});
+document.getElementById('btnCloseDashboard').addEventListener('click', ()=>{
+  document.getElementById('dashboardModal').classList.remove('open');
+});
+document.getElementById('dashboardModal').addEventListener('click', (e)=>{
+  if(e.target.id==='dashboardModal') document.getElementById('dashboardModal').classList.remove('open');
+});
+
+// ---------- imagen del dashboard para compartir (sin nombres, solo apartamentos) ----------
+function wrapTextLines(ctx, text, maxWidth){
+  const words = String(text).split(' ');
+  const lines = [];
+  let line = '';
+  words.forEach(w=>{
+    const test = line ? line+' '+w : w;
+    if(ctx.measureText(test).width > maxWidth && line){ lines.push(line); line = w; }
+    else { line = test; }
+  });
+  if(line) lines.push(line);
+  return lines;
+}
+
+function buildDashboardImageData(){
+  const topDeuda = deudaRows.slice().sort((a,b)=>(b.monto||0)-(a.monto||0)).slice(0,10).map(r=>({id:r.id, val:r.monto||0}));
+  const topRecibos = deudaRows.slice().sort((a,b)=>(b.meses||0)-(a.meses||0)).slice(0,10).map(r=>({id:r.id, val:r.meses||0}));
+  const buckets = [
+    {label:'1-3 meses', min:1, max:3, count:0, monto:0, color:'#f59e0b'},
+    {label:'4-6 meses', min:4, max:6, count:0, monto:0, color:'#fb923c'},
+    {label:'7-12 meses', min:7, max:12, count:0, monto:0, color:'#ef4444'},
+    {label:'+12 meses', min:13, max:Infinity, count:0, monto:0, color:'#b91c1c'}
+  ];
+  deudaRows.forEach(r=>{
+    const m = r.meses||0;
+    const b = buckets.find(bk=>m>=bk.min && m<=bk.max);
+    if(b){ b.count++; b.monto += (r.monto||0); }
+  });
+  const sinTelIds = apartments.filter(a=>!toWhatsAppNumber(a.telefono)).map(a=>a.id);
+  const totalDebt = deudaRows.reduce((s,r)=>s+(r.monto||0),0);
+  const sorted = deudaRows.slice().sort((a,b)=>(b.monto||0)-(a.monto||0));
+  let acc=0; const paretoRows=[];
+  for(const r of sorted){ paretoRows.push({id:r.id, val:r.monto||0}); acc += (r.monto||0); if(totalDebt>0 && acc>=totalDebt*0.8) break; }
+  const paretoPct = totalDebt>0 ? Math.round(acc/totalDebt*100) : 0;
+  return {topDeuda, topRecibos, buckets, sinTelIds, paretoRows, paretoAcc:acc, paretoPct};
+}
+
+function exportDashboardImage(){
+  const data = buildDashboardImageData();
+  const W = 900, PAD = 36;
+  const scratch = document.createElement('canvas').getContext('2d');
+
+  function measureWrapped(text, font, maxWidth){
+    scratch.font = font;
+    return wrapTextLines(scratch, text, maxWidth).length;
+  }
+
+  const barMax = Math.max(1, ...data.topDeuda.map(r=>r.val));
+  const recMax = Math.max(1, ...data.topRecibos.map(r=>r.val));
+  const bucketMax = Math.max(1, ...data.buckets.map(b=>b.count));
+
+  const sinTelText = data.sinTelIds.length ? data.sinTelIds.join('  ·  ') : 'Todos los apartamentos tienen teléfono registrado.';
+  const sinTelLines = measureWrapped(sinTelText, '13px -apple-system,Segoe UI,Roboto,sans-serif', W-PAD*2);
+  const paretoNote = data.paretoRows.length ? ('Estos '+data.paretoRows.length+' apartamento(s) concentran $'+data.paretoAcc.toLocaleString(undefined,{maximumFractionDigits:2})+' ('+data.paretoPct+'% de la deuda total del condominio).') : '';
+  const paretoNoteLines = paretoNote ? measureWrapped(paretoNote, '12px -apple-system,Segoe UI,Roboto,sans-serif', W-PAD*2) : 0;
+
+  let H = 120; // header + fecha
+  H += 34 + data.topDeuda.length*28 + 16; // top deuda
+  H += 34 + data.topRecibos.length*28 + 16; // top recibos
+  H += 34 + data.buckets.length*28 + 16; // envejecimiento
+  H += 34 + sinTelLines*18 + 16; // sin telefono
+  H += 34 + data.paretoRows.length*28 + paretoNoteLines*16 + 24; // pareto
+  H += 50; // footer
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // fondo
+  ctx.fillStyle = '#0f1720'; ctx.fillRect(0,0,W,H);
+
+  let y = 0;
+  // header
+  ctx.fillStyle = '#161f2b'; ctx.fillRect(0,0,W,90);
+  ctx.fillStyle = '#e7edf5'; ctx.font = 'bold 22px -apple-system,Segoe UI,Roboto,sans-serif';
+  ctx.fillText('HATILLO HILL · Resumen de deuda', PAD, 42);
+  ctx.fillStyle = '#94a3b8'; ctx.font = '13px -apple-system,Segoe UI,Roboto,sans-serif';
+  ctx.fillText('Generado el '+new Date().toLocaleDateString('es-VE',{year:'numeric',month:'long',day:'numeric'})+' · Solo se muestran números de apartamento, sin nombres de propietarios.', PAD, 66);
+  y = 110;
+
+  function sectionTitle(text){
+    ctx.fillStyle = '#e7edf5'; ctx.font = 'bold 14px -apple-system,Segoe UI,Roboto,sans-serif';
+    ctx.fillText(text, PAD, y);
+    y += 22;
+  }
+  function barRow(id, val, max, color, suffix){
+    const label = suffix ? (val+' '+suffix) : ('$'+val.toLocaleString(undefined,{maximumFractionDigits:2}));
+    ctx.fillStyle = '#e7edf5'; ctx.font = 'bold 13px -apple-system,Segoe UI,Roboto,sans-serif';
+    ctx.fillText(id, PAD, y);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = color; ctx.fillText(label, W-PAD, y);
+    ctx.textAlign = 'left';
+    const barW = W-PAD*2;
+    const pct = Math.max(0.02, val/max);
+    ctx.fillStyle = '#2a3646'; ctx.fillRect(PAD, y+6, barW, 6);
+    ctx.fillStyle = color; ctx.fillRect(PAD, y+6, barW*pct, 6);
+    y += 28;
+  }
+
+  sectionTitle('Top '+data.topDeuda.length+' · Deuda condominio ($)');
+  if(data.topDeuda.length===0){ ctx.fillStyle='#94a3b8'; ctx.font='13px sans-serif'; ctx.fillText('Sin datos de deuda.', PAD, y); y+=20; }
+  data.topDeuda.forEach(r=> barRow(r.id, r.val, barMax, '#ef4444'));
+  y += 16;
+
+  sectionTitle('Top '+data.topRecibos.length+' · Recibos vencidos');
+  data.topRecibos.forEach(r=> barRow(r.id, r.val, recMax, '#f59e0b', 'recibo(s)'));
+  y += 16;
+
+  sectionTitle('Envejecimiento de deuda');
+  data.buckets.forEach(b=>{
+    ctx.fillStyle = '#e7edf5'; ctx.font = 'bold 13px -apple-system,Segoe UI,Roboto,sans-serif';
+    ctx.fillText(b.label+'  ('+b.count+' apto(s))', PAD, y);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = b.color; ctx.fillText('$'+b.monto.toLocaleString(undefined,{maximumFractionDigits:2}), W-PAD, y);
+    ctx.textAlign = 'left';
+    const barW = W-PAD*2, pct = Math.max(0.02, b.count/bucketMax);
+    ctx.fillStyle = '#2a3646'; ctx.fillRect(PAD, y+6, barW, 6);
+    ctx.fillStyle = b.color; ctx.fillRect(PAD, y+6, barW*pct, 6);
+    y += 28;
+  });
+  y += 16;
+
+  sectionTitle('Sin teléfono registrado ('+data.sinTelIds.length+')');
+  ctx.fillStyle = '#94a3b8'; ctx.font = '13px -apple-system,Segoe UI,Roboto,sans-serif';
+  wrapTextLines(ctx, sinTelText, W-PAD*2).forEach(line=>{ ctx.fillText(line, PAD, y); y += 18; });
+  y += 16;
+
+  sectionTitle('Concentración de deuda (Pareto 80%)');
+  data.paretoRows.forEach(r=> barRow(r.id, r.val, Math.max(1,...data.paretoRows.map(x=>x.val)), '#ef4444'));
+  if(paretoNote){
+    ctx.fillStyle = '#94a3b8'; ctx.font = '12px -apple-system,Segoe UI,Roboto,sans-serif';
+    wrapTextLines(ctx, paretoNote, W-PAD*2).forEach(line=>{ ctx.fillText(line, PAD, y); y += 16; });
+  }
+  y += 8;
+
+  ctx.fillStyle = '#64748b'; ctx.font = '11px -apple-system,Segoe UI,Roboto,sans-serif';
+  ctx.fillText('Junta de Condominio · Hatillo Hill', PAD, H-20);
+
+  canvas.toBlob(function(blob){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'hatillo_hill_resumen_deuda.png';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 'image/png');
+}
+document.getElementById('btnShareDashboardImg').addEventListener('click', exportDashboardImage);
+
+// ---------- tabs ----------
+document.querySelectorAll('.stab').forEach(t=>{
+  t.addEventListener('click', ()=>{ currentTab=t.dataset.tab; renderSidebar(); });
+});
+document.getElementById('btnExportSnapshot').addEventListener('click', exportSnapshot);
+
+function exportSnapshot(){
+  const snapshot = {
+    condominio: RAW_DATA.condominio,
+    presupuesto_estimado_anual: RAW_DATA.presupuesto_estimado_anual,
+    apartamentos: apartments,
+    estacionamientos_sotano: parking,
+    maleteros_sotano: maleteros,
+    deuda: deudaRows,
+    proyectos_especiales: proyectos
+  };
+  const snapshotJson = JSON.stringify(snapshot);
+  let html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+  html = html.replace(/const RAW_DATA = \{[\s\S]*?\};/, 'const RAW_DATA = ' + snapshotJson + ';');
+  const blob = new Blob([html], {type:'text/html'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'hatillo_hill_3d_compartir.html';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// mobile toggle
+const mobileToggle = document.getElementById('mobileToggle');
+function checkMobile(){
+  if(window.innerWidth<=820){
+    mobileToggle.style.display='block';
+    document.getElementById('sidebar').classList.add('hidden');
+  } else {
+    mobileToggle.style.display='none';
+    document.getElementById('sidebar').classList.remove('hidden');
+  }
+}
+mobileToggle.addEventListener('click', ()=>{
+  document.getElementById('sidebar').classList.toggle('hidden');
+});
+window.addEventListener('resize', checkMobile);
+checkMobile();
+
+// ---------- init ----------
+async function init(){
+  restoreDriveSession();
+  await loadOverrides();
+  resize();
+  buildScene();
+  renderTopbar();
+  renderSidebar();
+  animate();
+}
+init();
+</script>
+
+
+</body></html>
