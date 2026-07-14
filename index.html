@@ -236,6 +236,7 @@ let filterDeuda = null; // 'con' | 'sin' | null
 let selected = null; // {type:'apt'|'park'|'malet', ref}
 let currentTab = 'lista';
 let selectedProyectoId = null;
+let pendingPagoAptId = null; // apto a preseleccionar en "Registrar abono" al llegar desde el boton "Pagar" de la Lista
 
 const PISOS = ['PB','1','2','3','PH'];
 const SOTANOS = ['1','2','3'];
@@ -1389,6 +1390,34 @@ function renderSidebar(){
   else renderResumenTab(body);
 }
 
+function exportApartmentsToExcel(){
+  const rows = apartments.map(a=>{
+    const d = findDeuda(a);
+    return {
+      'ID': a.id,
+      'Torre': a.torre||'',
+      'Piso': a.piso||'',
+      'Propietario': a.propietario||'',
+      'Teléfono': a.telefono||'',
+      'Segundo contacto': a.contacto2_nombre||'',
+      'Teléfono 2': a.contacto2_telefono||'',
+      'Alquilado': a.alquilado ? 'Sí' : 'No',
+      'Inquilino': a.inquilino_nombre||'',
+      'Teléfono inquilino': a.inquilino_telefono||'',
+      'Estado': estadoLabel(a.estado),
+      'Total m²': a.total_m2!=null?a.total_m2:'',
+      'Cuota mensual': a.cuota_mensual!=null?a.cuota_mensual:'',
+      'Deuda condominio (USD)': d && d.monto!=null ? d.monto : '',
+      'Recibos vencidos': d && d.meses!=null ? d.meses : ''
+    };
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = Object.keys(rows[0]||{}).map(k=>({wch: Math.max(12, k.length+2)}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Propietarios');
+  XLSX.writeFile(wb, 'hatillo_hill_propietarios.xlsx');
+}
+
 function renderListaTab(body){
   const settings = document.createElement('details');
   settings.style.marginBottom = '12px';
@@ -1458,9 +1487,16 @@ function renderListaTab(body){
     '<div><b style="color:var(--text);">Deuda proyecto(s) en curso:</b> $'+totalProjDebt.toLocaleString(undefined,{maximumFractionDigits:2})+' ('+aptsConProjDebt+' apto(s))</div>';
   body.appendChild(resumenBox);
 
+  const btnExportXls = document.createElement('button');
+  btnExportXls.className = 'btn ghost';
+  btnExportXls.style.cssText = 'width:100%;margin-bottom:10px;';
+  btnExportXls.textContent = '📊 Exportar propietarios a Excel';
+  btnExportXls.onclick = exportApartmentsToExcel;
+  body.appendChild(btnExportXls);
+
   const search = document.createElement('input');
   search.className='searchbox';
-  search.placeholder='Buscar por apto, propietario o piso...';
+  search.placeholder='Buscar (ej. apb2, camacho, pb, a)...';
   search.oninput = ()=>{ renderList(body, search.value.toLowerCase()); };
   body.appendChild(search);
   const listHost = document.createElement('div');
@@ -1469,17 +1505,29 @@ function renderListaTab(body){
   renderList(body, '');
 }
 
+const PISOS_SET_SEARCH = new Set(['PB','1','2','3','PH']);
+const TORRES_SET_SEARCH = new Set(['A','B']);
+function normalizeSearch(s){
+  return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+}
 function renderList(body, q){
   const listHost = document.getElementById('listHost');
   listHost.innerHTML='';
+  const qTrim = (q||'').trim();
+  const qUpper = qTrim.toUpperCase();
+  const qIsPiso = PISOS_SET_SEARCH.has(qUpper);
+  const qIsTorre = TORRES_SET_SEARCH.has(qUpper);
+  const qNorm = normalizeSearch(qTrim);
   let items = apartments.filter(a=>{
     if(filterPiso!=='ALL' && a.piso!==filterPiso) return false;
     if(filterTorre!=='ALL' && a.torre!==filterTorre) return false;
     if(filterDeuda==='con' && !findDeuda(a)) return false;
     if(filterDeuda==='sin' && !!findDeuda(a)) return false;
-    if(q){
-      const hay = (a.id+' '+(a.propietario||'')+' '+a.piso+' '+a.torre).toLowerCase();
-      if(!hay.includes(q)) return false;
+    if(qTrim){
+      if(qIsPiso) return a.piso===qUpper;
+      if(qIsTorre) return a.torre===qUpper;
+      const hayNorm = normalizeSearch(a.id)+normalizeSearch(a.piso)+normalizeSearch(a.torre)+normalizeSearch(a.propietario);
+      if(!hayNorm.includes(qNorm)) return false;
     }
     return true;
   });
@@ -1540,6 +1588,22 @@ function renderList(body, q){
       sendWhatsAppToApt(a, ()=>fillTemplate(whatsappTemplateGeneral, {nombre:a.propietario||'', id:a.id}), ()=>setTimeout(()=>renderList(body, q), 300));
     };
     btnRow.appendChild(btnWa);
+
+    if(proyectos.length>0){
+      const btnPagar = document.createElement('button');
+      btnPagar.className = 'btn ghost';
+      btnPagar.style.flex = '1';
+      btnPagar.textContent = '💳 Pagar';
+      btnPagar.title = 'Ir a registrar un abono de este apartamento en "'+proyectos[0].nombre+'"';
+      btnPagar.onclick = (e)=>{
+        e.stopPropagation();
+        pendingPagoAptId = a.id;
+        selectedProyectoId = proyectos[0].id;
+        currentTab = 'proyectos';
+        renderSidebar();
+      };
+      btnRow.appendChild(btnPagar);
+    }
 
     if(tieneDeuda){
       const btnCobrar = document.createElement('button');
@@ -1706,6 +1770,18 @@ function parseSpanishNumber(s){
   else { s = s.replace(',', '.'); }
   const n = parseFloat(s);
   return isNaN(n) ? null : n;
+}
+// acepta dd/mm/aaaa, dd-mm-aaaa o dd/mm/aa; devuelve ISO string o null si no matchea
+function parseSpanishDate(str){
+  const s = (str||'').trim();
+  if(!s) return null;
+  const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if(!m) return null;
+  let d = parseInt(m[1],10), mo = parseInt(m[2],10), y = parseInt(m[3],10);
+  if(y<100) y += 2000;
+  if(mo<1||mo>12||d<1||d>31) return null;
+  const date = new Date(y, mo-1, d, 12, 0, 0);
+  return isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 function parseDeudaPaste(text){
@@ -1917,7 +1993,7 @@ function renderProyectoDetalle(body, p){
   const recaudado = (p.aportes||[]).reduce((s,a)=>s+(a.monto_pagado||0),0);
   const pct = p.presupuesto_total ? Math.min(100, Math.round(recaudado/p.presupuesto_total*100)) : 0;
   const wrap = document.createElement('div');
-  const filasHtml = (p.aportes||[]).map(ap=>{
+  function aporteRowHtml(ap){
     const apt = apartments.find(a=>a.id===ap.apt_id);
     const pendiente = Math.max(0, (ap.monto_aporte||0) - (ap.monto_pagado||0));
     const badge = pendiente<=0.005 ? '<span class="badge entregado">Al día</span>' : '<span class="badge sinentregar">Pendiente</span>';
@@ -1928,12 +2004,25 @@ function renderProyectoDetalle(body, p){
           return '<div class="comp-item" style="padding-left:14px;"><span class="t">'+fecha+' · '+esc(h.forma_pago||'No especificado')+'</span><span>$'+(h.monto||0).toFixed(2)+'</span></div>';
         }).join('')
       : '<div class="empty" style="padding:8px 0;">Sin pagos registrados.</div>';
-    return '<details>'
+    return '<details open>'
       +'<summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:7px 9px;background:var(--panel2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:12px;margin-bottom:2px;">'
       +'<span class="t">'+esc(ap.apt_id)+' · '+esc(apt?apt.propietario:'')+'</span>'
       +'<span>$'+(ap.monto_pagado||0).toFixed(2)+' / $'+(ap.monto_aporte||0).toFixed(2)+' '+badge+'</span>'
       +'</summary>'+historialHtml+'</details>';
-  }).join('');
+  }
+  function renderAportesList(q){
+    const host = document.getElementById('aportesListHost');
+    if(!host) return;
+    const qTrim = (q||'').trim();
+    if(!qTrim){ host.innerHTML = '<div class="empty">Escribe el ID o el nombre del propietario para ver su historial de aportes.</div>'; return; }
+    const qNorm = normalizeSearch(qTrim);
+    const matches = (p.aportes||[]).filter(ap=>{
+      const apt = apartments.find(a=>a.id===ap.apt_id);
+      const hay = normalizeSearch(ap.apt_id)+normalizeSearch(apt?apt.propietario:'');
+      return hay.includes(qNorm);
+    });
+    host.innerHTML = matches.length ? matches.map(aporteRowHtml).join('') : '<div class="empty">Sin coincidencias.</div>';
+  }
   const opciones = (p.aportes||[]).map(ap=>'<option value="'+esc(ap.apt_id)+'">'+esc(ap.apt_id)+'</option>').join('');
   wrap.innerHTML = `
     <div class="detail-head">
@@ -1957,14 +2046,25 @@ function renderProyectoDetalle(body, p){
     <div class="savebar"><button class="btn primary" id="btnAbonar" style="flex:1;">Registrar y avisar por WhatsApp</button></div>
     <div class="savedFlag" id="savedFlagProy"></div>
     <h3 class="section" style="margin-top:16px;">Cargar pagos existentes (en lote)</h3>
-    <div class="assumption">Para pagos ya realizados antes de usar esta app (no envía WhatsApp). Pega "ID [TAB] Monto pagado a la fecha" o, si el aporte real de cada apartamento no es el reparto automático, "ID [TAB] Aporte total [TAB] Monto pagado [TAB] Forma de pago (opcional)" para fijar ambos valores exactos y, si quieres, dejar registrada la forma de pago.</div>
+    <div class="assumption">Para pagos ya realizados antes de usar esta app (no envía WhatsApp). Pega "ID [TAB] Monto pagado a la fecha" o, si el aporte real de cada apartamento no es el reparto automático, "ID [TAB] Aporte total [TAB] Monto pagado [TAB] Forma de pago (opcional) [TAB] Fecha del pago dd/mm/aaaa (opcional, si no la pones queda la fecha de hoy)" para fijar los valores exactos.</div>
     <textarea id="abonosPaste" placeholder="A3-6	500.05" style="width:100%;min-height:80px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:9px;font-size:12px;font-family:monospace;"></textarea>
     <div class="savebar" style="margin-top:8px;"><button class="btn ghost" id="btnCargarAbonos" style="flex:1;">Cargar pagos (sobrescribe el monto pagado)</button></div>
     <div class="savedFlag" id="flagAbonosLote"></div>
     <h3 class="section" style="margin-top:16px;">Aportes por apartamento (${(p.aportes||[]).length})</h3>
-    <div class="comp-list">${filasHtml || '<div class="empty">Sin aportes calculados.</div>'}</div>
+    <input type="text" id="ap_buscar_apto" class="searchbox" placeholder="Buscar apartamento o propietario...">
+    <div id="aportesListHost"></div>
   `;
   body.appendChild(wrap);
+  document.getElementById('ap_buscar_apto').oninput = (e)=> renderAportesList(e.target.value);
+  renderAportesList('');
+  if(pendingPagoAptId){
+    const sel = document.getElementById('ab_apt');
+    if(sel && (p.aportes||[]).some(x=>x.apt_id===pendingPagoAptId)){
+      sel.value = pendingPagoAptId;
+      document.getElementById('ab_monto').focus();
+    }
+    pendingPagoAptId = null;
+  }
   document.getElementById('btnBackProy').onclick = ()=>{ selectedProyectoId=null; renderSidebar(); };
   document.getElementById('btnAbonar').onclick = async ()=>{
     const aptId = document.getElementById('ab_apt').value;
@@ -2000,20 +2100,21 @@ function renderProyectoDetalle(body, p){
       if(!id) return;
       const ap = (p.aportes||[]).find(x=>normalizeId(x.apt_id)===normalizeId(id));
       if(!ap){ sinMatch.push(id); return; }
-      let monto, formaPago = null;
+      let monto, formaPago = null, fechaPago = null;
       if(parts.length>=3){
         const aporte = parseSpanishNumber(parts[1]);
         monto = parseSpanishNumber(parts[2]);
         if(aporte===null || monto===null) return;
         ap.monto_aporte = aporte;
         if(parts.length>=4 && parts[3].trim()) formaPago = parts[3].trim();
+        if(parts.length>=5 && parts[4].trim()) fechaPago = parseSpanishDate(parts[4]);
       } else {
         monto = parseSpanishNumber(parts[1]);
         if(monto===null) return;
       }
       ap.monto_pagado = monto;
       ap.historial = ap.historial||[];
-      ap.historial.push({monto, fecha:new Date().toISOString(), forma_pago:formaPago, nota:'carga en lote'});
+      ap.historial.push({monto, fecha: fechaPago || new Date().toISOString(), forma_pago:formaPago, nota:'carga en lote'});
       actualizados++;
     });
     await saveProyectos();
@@ -2141,6 +2242,27 @@ function widgetEnvejecimiento(){
   return '<div class="dashWidget"><h3>Envejecimiento de deuda (condominio) · toca un rango para ver los apartamentos</h3>'+body+'</div>';
 }
 
+// apartamentos con deuda (condominio o proyecto especial) a los que toca escribirles hoy,
+// según recordatorioFrecuenciaDias; "nunca se le ha escrito" cuenta como vencido de inmediato
+function widgetRecordatoriosPendientes(){
+  const pendientes = apartments.filter(a=>{
+    const d = findDeuda(a);
+    const projDebts = proyectoDeudas(a.id);
+    const tieneDeuda = !!d || projDebts.length>0;
+    if(!tieneDeuda) return false;
+    return diasDesdeEnvio(a) >= recordatorioFrecuenciaDias;
+  }).sort((a,b)=> diasDesdeEnvio(b) - diasDesdeEnvio(a));
+  const body = pendientes.length ? pendientes.map(a=>{
+    const dias = diasDesdeEnvio(a);
+    const diasTxt = dias===Infinity ? 'nunca se le ha escrito' : 'hace '+Math.floor(dias)+' día(s)';
+    const tieneTel = getContactOptions(a).length>0;
+    return '<div class="dashRow"><span class="dashId">'+esc(a.id)+'</span>'
+      +'<span class="dashOwner">'+esc(a.propietario||'')+' · '+diasTxt+'</span>'
+      +'<button class="btn ghost" data-recordatorio-id="'+esc(a.id)+'" style="padding:3px 8px;font-size:11px;flex:0 0 auto;" '+(tieneTel?'':'disabled title="Sin teléfono registrado"')+'>💬 Recordar</button></div>';
+  }).join('') : '<div class="dashEmpty">No hay recordatorios pendientes hoy.</div>';
+  return '<div class="dashWidget" style="grid-column:1/-1;"><h3>Recordatorios de cobro pendientes ('+pendientes.length+')</h3>'+body+'</div>';
+}
+
 function widgetSinTelefono(){
   const sinTel = apartments.filter(a=>!toWhatsAppNumber(a.telefono));
   const body = sinTel.length ? sinTel.map(a=>
@@ -2254,7 +2376,7 @@ function widgetMovimientosDeuda(){
 
 function renderDashboard(){
   const body = document.getElementById('dashboardBody');
-  body.innerHTML = widgetTopDeudaCondominio() + widgetTopRecibosVencidos() + widgetEnvejecimiento() + widgetSinTelefono() + widgetPareto80() + widgetHistoricoDeudaTotal() + widgetMovimientosDeuda();
+  body.innerHTML = widgetRecordatoriosPendientes() + widgetTopDeudaCondominio() + widgetTopRecibosVencidos() + widgetEnvejecimiento() + widgetSinTelefono() + widgetPareto80() + widgetHistoricoDeudaTotal() + widgetMovimientosDeuda();
 }
 document.getElementById('btnOpenDashboard').addEventListener('click', ()=>{
   renderDashboard();
@@ -2264,7 +2386,16 @@ document.getElementById('btnCloseDashboard').addEventListener('click', ()=>{
   document.getElementById('dashboardModal').classList.remove('open');
 });
 document.getElementById('dashboardModal').addEventListener('click', (e)=>{
-  if(e.target.id==='dashboardModal') document.getElementById('dashboardModal').classList.remove('open');
+  if(e.target.id==='dashboardModal'){ document.getElementById('dashboardModal').classList.remove('open'); return; }
+  const btnRec = e.target.closest('[data-recordatorio-id]');
+  if(btnRec){
+    const a = apartments.find(x=>x.id===btnRec.dataset.recordatorioId);
+    if(a){
+      const d = findDeuda(a);
+      const projDebts = proyectoDeudas(a.id);
+      sendWhatsAppToApt(a, ()=>buildCobroMessage(a, d, projDebts), ()=>setTimeout(renderDashboard, 300));
+    }
+  }
 });
 
 // ---------- imagen del dashboard para compartir (sin nombres, solo apartamentos) ----------
