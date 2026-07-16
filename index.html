@@ -101,12 +101,15 @@
 
   .assumption{font-size:10.5px;color:var(--sub);background:var(--panel2);border:1px dashed var(--border);border-radius:7px;padding:7px 9px;margin-bottom:10px;line-height:1.5;}
 
-  #dashboardModal{position:fixed;inset:0;background:rgba(6,10,15,0.72);backdrop-filter:blur(3px);z-index:100;display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 16px;}
-  #dashboardModal.open{display:flex;}
-  .dashCard{background:var(--panel);border:1px solid var(--border);border-radius:14px;width:100%;max-width:980px;padding:20px 22px 26px;}
-  .dashHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+  /* panel flotante y movible: no bloquea el resto de la app, se puede arrastrar a un lado
+     mientras se hacen cobros/pagos/edicion con el dashboard siempre visible */
+  #dashboardModal{position:fixed;top:70px;right:20px;z-index:100;display:none;}
+  #dashboardModal.open{display:block;}
+  .dashCard{background:var(--panel);border:1px solid var(--border);border-radius:14px;width:640px;max-width:calc(100vw - 32px);height:min(75vh,720px);max-height:calc(100vh - 90px);padding:20px 22px 26px;box-shadow:0 16px 44px rgba(0,0,0,0.55);display:flex;flex-direction:column;resize:both;overflow:auto;min-width:340px;min-height:260px;}
+  .dashHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;cursor:move;user-select:none;flex:0 0 auto;}
   .dashHead h2{margin:0;font-size:18px;}
-  .dashGrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  #dashHojasBar{flex:0 0 auto;}
+  .dashGrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;overflow-y:auto;flex:1;padding-right:4px;}
   @media (max-width:760px){ .dashGrid{grid-template-columns:1fr;} .dashCard{padding:16px;} }
   .dashWidget{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:14px;}
   .dashWidget h3{margin:0 0 10px 0;font-size:12.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--sub);}
@@ -2574,7 +2577,6 @@ document.getElementById('btnCloseDashboard').addEventListener('click', ()=>{
   document.getElementById('dashboardModal').classList.remove('open');
 });
 document.getElementById('dashboardModal').addEventListener('click', (e)=>{
-  if(e.target.id==='dashboardModal'){ document.getElementById('dashboardModal').classList.remove('open'); return; }
   const btnRec = e.target.closest('[data-recordatorio-id]');
   if(btnRec){
     const a = apartments.find(x=>x.id===btnRec.dataset.recordatorioId);
@@ -2585,6 +2587,45 @@ document.getElementById('dashboardModal').addEventListener('click', (e)=>{
     }
   }
 });
+
+// el dashboard es un panel flotante (no bloquea el resto de la app): se arrastra desde su
+// encabezado para dejarlo a un lado mientras se hacen cobros, pagos o ediciones en simultáneo
+(function(){
+  const modal = document.getElementById('dashboardModal');
+  const head = modal.querySelector('.dashHead');
+  let dragging = false, offsetX = 0, offsetY = 0;
+  function startDrag(clientX, clientY, target){
+    if(target.closest('button')) return;
+    const rect = modal.getBoundingClientRect();
+    dragging = true;
+    offsetX = clientX - rect.left;
+    offsetY = clientY - rect.top;
+    modal.style.right = 'auto';
+    modal.style.left = rect.left+'px';
+    modal.style.top = rect.top+'px';
+  }
+  function moveDrag(clientX, clientY){
+    if(!dragging) return;
+    const w = modal.offsetWidth, h = modal.offsetHeight;
+    let x = Math.max(0, Math.min(window.innerWidth - Math.min(80,w), clientX - offsetX));
+    let y = Math.max(0, Math.min(window.innerHeight - 40, clientY - offsetY));
+    modal.style.left = x+'px';
+    modal.style.top = y+'px';
+  }
+  head.addEventListener('mousedown', (e)=>{ startDrag(e.clientX, e.clientY, e.target); if(dragging) e.preventDefault(); });
+  document.addEventListener('mousemove', (e)=> moveDrag(e.clientX, e.clientY));
+  document.addEventListener('mouseup', ()=>{ dragging=false; });
+  head.addEventListener('touchstart', (e)=>{
+    const t = e.touches[0];
+    startDrag(t.clientX, t.clientY, e.target);
+  }, {passive:true});
+  document.addEventListener('touchmove', (e)=>{
+    if(!dragging) return;
+    const t = e.touches[0];
+    moveDrag(t.clientX, t.clientY);
+  }, {passive:true});
+  document.addEventListener('touchend', ()=>{ dragging=false; });
+})();
 
 // ---------- imagen del dashboard para compartir (sin nombres, solo apartamentos) ----------
 function wrapTextLines(ctx, text, maxWidth){
