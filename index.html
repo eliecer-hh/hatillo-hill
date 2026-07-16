@@ -171,6 +171,11 @@
             <button class="backbtn" id="btnCloseDashboard">✕ Cerrar</button>
           </div>
         </div>
+        <div class="chipbar" id="dashHojasBar" style="margin-bottom:14px;">
+          <button class="chip active" data-hoja="1">Hoja 1 · Resumen</button>
+          <button class="chip" data-hoja="2">Hoja 2 · Deudores condominio</button>
+          <button class="chip" data-hoja="3">Hoja 3 · Deudores proyecto</button>
+        </div>
         <div class="dashGrid" id="dashboardBody"></div>
       </div>
     </div>
@@ -893,17 +898,14 @@ function apartmentsByTowerFloor(torre,piso){
 }
 
 // distribución real de apartamentos por piso: columna izquierda (1..n/2, cerca->lejos del nucleo)
-// columna derecha: en Torre A invertida (n..n/2+1), en Torre B normal (n/2+1..n) - según plano
+// columna derecha (lado escaleras): invertida (n..n/2+1) en ambas torres - la fila de Torre B
+// también va girada 180° respecto al núcleo, igual que Torre A, según corrección del plano real.
 function layoutColumns(torre, n){
   const half = Math.ceil(n/2);
   const left = [];
   for(let i=1;i<=half;i++) left.push(i);
   const right = [];
-  if(torre==='A'){
-    for(let i=n;i>half;i--) right.push(i);
-  } else {
-    for(let i=half+1;i<=n;i++) right.push(i);
-  }
+  for(let i=n;i>half;i--) right.push(i);
   return {left, right};
 }
 
@@ -2040,8 +2042,13 @@ function renderProyectoDetalle(body, p){
   function renderAportesList(q){
     const host = document.getElementById('aportesListHost');
     if(!host) return;
+    if(viewingAll){
+      const matches = (p.aportes||[]).filter(ap=>(ap.monto_pagado||0)>0).sort((a,b)=>a.apt_id.localeCompare(b.apt_id));
+      host.innerHTML = matches.length ? matches.map(aporteRowHtml).join('') : '<div class="empty">Ningún apartamento tiene pagos registrados todavía.</div>';
+      return;
+    }
     const qTrim = (q||'').trim();
-    if(!qTrim){ host.innerHTML = '<div class="empty">Escribe el ID o el nombre del propietario para ver su historial de aportes.</div>'; return; }
+    if(!qTrim){ host.innerHTML = '<div class="empty">Escribe el ID o el nombre del propietario, o toca "Ver todos los pagos".</div>'; return; }
     const qNorm = normalizeSearch(qTrim);
     const matches = (p.aportes||[]).filter(ap=>{
       const apt = apartments.find(a=>a.id===ap.apt_id);
@@ -2059,7 +2066,11 @@ function renderProyectoDetalle(body, p){
     <div class="assumption">${esc(p.descripcion||'')}</div>
     <div class="statline"><span>Presupuesto</span><b>$${(p.presupuesto_total||0).toLocaleString()}</b></div>
     <div class="statline"><span>Recaudado</span><b id="proyRecaudado" style="color:#10b981">$${recaudado.toLocaleString(undefined,{maximumFractionDigits:2})} (${pct}%)</b></div>
-    <h3 class="section" style="margin-top:14px;">Registrar abono</h3>
+    <h3 class="section" style="margin-top:14px;">Aportes por apartamento (${(p.aportes||[]).length})</h3>
+    <input type="text" id="ap_buscar_apto" class="searchbox" placeholder="Buscar apartamento o propietario...">
+    <div class="savebar" style="margin:-4px 0 10px;"><button class="btn ghost" id="btnVerTodosPagos" style="flex:1;">👁️ Ver todos los pagos</button></div>
+    <div id="aportesListHost"></div>
+    <h3 class="section" style="margin-top:16px;">Registrar abono</h3>
     <div class="form-row"><label>Apartamento</label><select id="ab_apt">${opciones}</select></div>
     <div class="form-row two">
       <div><label>Monto abonado (USD)</label><input id="ab_monto" type="number" step="0.01"></div>
@@ -2077,17 +2088,22 @@ function renderProyectoDetalle(body, p){
     <textarea id="abonosPaste" placeholder="A3-6	500.05" style="width:100%;min-height:80px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:9px;font-size:12px;font-family:monospace;"></textarea>
     <div class="savebar" style="margin-top:8px;"><button class="btn ghost" id="btnCargarAbonos" style="flex:1;">Cargar pagos (sobrescribe el monto pagado)</button></div>
     <div class="savedFlag" id="flagAbonosLote"></div>
-    <h3 class="section" style="margin-top:16px;">Corregir pagos existentes (en lote)</h3>
-    <div class="assumption">Para completar la forma de pago (y el monto, si hace falta corregirlo) de pagos que ya están registrados pero les falta ese dato. Pega "ID [TAB] Propietario [TAB] Monto [TAB] Forma de pago" (igual que tu Excel) o simplemente "ID [TAB] Forma de pago" si el monto ya está bien. Corrige el pago más reciente registrado de cada apartamento; la fecha no se toca. Si el apartamento no tiene ningún pago registrado todavía (data migrada antes de este seguimiento), se crea el primer registro con estos datos.</div>
-    <textarea id="corregirPagosPaste" placeholder="B-2-8	Juan Pérez	60.00	Efectivo" style="width:100%;min-height:80px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:9px;font-size:12px;font-family:monospace;"></textarea>
-    <div class="savebar" style="margin-top:8px;"><button class="btn ghost" id="btnCorregirPagos" style="flex:1;">Corregir pagos existentes</button></div>
-    <div class="savedFlag" id="flagCorregirPagos"></div>
-    <h3 class="section" style="margin-top:16px;">Aportes por apartamento (${(p.aportes||[]).length})</h3>
-    <input type="text" id="ap_buscar_apto" class="searchbox" placeholder="Buscar apartamento o propietario...">
-    <div id="aportesListHost"></div>
+    <div id="corregirPagosSection" style="display:none;">
+      <h3 class="section" style="margin-top:16px;">Corregir pagos existentes (en lote)</h3>
+      <div class="assumption">Para completar la forma de pago (y el monto, si hace falta corregirlo) de pagos que ya están registrados pero les falta ese dato. Pega "ID [TAB] Propietario [TAB] Monto [TAB] Forma de pago" (igual que tu Excel) o simplemente "ID [TAB] Forma de pago" si el monto ya está bien. Corrige el pago más reciente registrado de cada apartamento; la fecha no se toca. Si el apartamento no tiene ningún pago registrado todavía (data migrada antes de este seguimiento), se crea el primer registro con estos datos.</div>
+      <textarea id="corregirPagosPaste" placeholder="B-2-8	Juan Pérez	60.00	Efectivo" style="width:100%;min-height:80px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:9px;font-size:12px;font-family:monospace;"></textarea>
+      <div class="savebar" style="margin-top:8px;"><button class="btn ghost" id="btnCorregirPagos" style="flex:1;">Corregir pagos existentes</button></div>
+      <div class="savedFlag" id="flagCorregirPagos"></div>
+    </div>
   `;
   body.appendChild(wrap);
-  document.getElementById('ap_buscar_apto').oninput = (e)=> renderAportesList(e.target.value);
+  let viewingAll = false;
+  document.getElementById('ap_buscar_apto').oninput = (e)=> { viewingAll = false; renderAportesList(e.target.value); };
+  document.getElementById('btnVerTodosPagos').onclick = ()=>{
+    viewingAll = true;
+    document.getElementById('ap_buscar_apto').value = '';
+    renderAportesList('');
+  };
   renderAportesList('');
   function refreshRecaudado(){
     const nuevoRecaudado = (p.aportes||[]).reduce((s,a)=>s+(a.monto_pagado||0),0);
@@ -2501,11 +2517,56 @@ function widgetMovimientosDeuda(){
   return '<div class="dashWidget" style="grid-column:1/-1;"><h3>Movimientos de deuda · actualización del '+fecha+'</h3>'+(body || '<div class="dashEmpty">No hubo cambios respecto a la actualización anterior.</div>')+'</div>';
 }
 
+// hoja 2: listado completo (no solo top 10) de deudores del condominio, para exportar sin nombres
+function widgetTodosDeudoresCondominio(){
+  const rows = deudaRows.slice().sort((a,b)=>(b.monto||0)-(a.monto||0));
+  const total = rows.reduce((s,r)=>s+(r.monto||0),0);
+  const body = rows.length ? rows.map((r,i)=>
+    '<div class="dashRow"><span class="dashRank">'+(i+1)+'</span><span class="dashId">'+esc(r.id)+'</span>'
+    +'<span class="dashOwner">'+esc(r.propietario||'')+'</span>'
+    +'<span class="dashVal" style="color:#ef4444;">'+fmtMoney(r.monto)+(r.meses!=null?' · '+r.meses+' recibo(s)':'')+'</span></div>'
+  ).join('') : '<div class="dashEmpty">Sin datos de deuda cargados.</div>';
+  return '<div class="dashWidget" style="grid-column:1/-1;"><h3>Todos los deudores del condominio ('+rows.length+') · Total '+fmtMoney(total)+'</h3>'+body+'</div>';
+}
+// hoja 3: listado completo de deudores del proyecto especial en curso (el vigente = proyectos[0]), para exportar sin nombres
+function widgetTodosDeudoresProyecto(){
+  const p = proyectos[0];
+  if(!p) return '<div class="dashWidget" style="grid-column:1/-1;"><h3>Deudores del proyecto en curso</h3><div class="dashEmpty">No hay ningún proyecto especial activo.</div></div>';
+  const rows = (p.aportes||[]).map(ap=>({
+    id: ap.apt_id,
+    propietario: (apartments.find(a=>a.id===ap.apt_id)||{}).propietario,
+    pendiente: Math.max(0, (ap.monto_aporte||0) - (ap.monto_pagado||0))
+  })).filter(r=>r.pendiente>0.005).sort((a,b)=>b.pendiente-a.pendiente);
+  const total = rows.reduce((s,r)=>s+r.pendiente,0);
+  const body = rows.length ? rows.map((r,i)=>
+    '<div class="dashRow"><span class="dashRank">'+(i+1)+'</span><span class="dashId">'+esc(r.id)+'</span>'
+    +'<span class="dashOwner">'+esc(r.propietario||'')+'</span>'
+    +'<span class="dashVal" style="color:#ef4444;">'+fmtMoney(r.pendiente)+'</span></div>'
+  ).join('') : '<div class="dashEmpty">No hay apartamentos pendientes en este proyecto.</div>';
+  return '<div class="dashWidget" style="grid-column:1/-1;"><h3>Todos los deudores de "'+esc(p.nombre)+'" ('+rows.length+') · Pendiente total '+fmtMoney(total)+'</h3>'+body+'</div>';
+}
+
+let currentDashHoja = '1';
 function renderDashboard(){
   const body = document.getElementById('dashboardBody');
-  body.innerHTML = widgetRecordatoriosPendientes() + widgetTopDeudaCondominio() + widgetTopRecibosVencidos() + widgetEnvejecimiento() + widgetSinTelefono() + widgetPareto80() + widgetHistoricoDeudaTotal() + widgetMovimientosDeuda();
+  if(currentDashHoja==='2'){
+    body.innerHTML = widgetTodosDeudoresCondominio();
+  } else if(currentDashHoja==='3'){
+    body.innerHTML = widgetTodosDeudoresProyecto();
+  } else {
+    body.innerHTML = widgetRecordatoriosPendientes() + widgetTopDeudaCondominio() + widgetTopRecibosVencidos() + widgetEnvejecimiento() + widgetSinTelefono() + widgetPareto80() + widgetHistoricoDeudaTotal() + widgetMovimientosDeuda();
+  }
 }
+document.getElementById('dashHojasBar').addEventListener('click', (e)=>{
+  const btn = e.target.closest('[data-hoja]');
+  if(!btn) return;
+  currentDashHoja = btn.dataset.hoja;
+  document.querySelectorAll('#dashHojasBar .chip').forEach(c=>c.classList.toggle('active', c===btn));
+  renderDashboard();
+});
 document.getElementById('btnOpenDashboard').addEventListener('click', ()=>{
+  currentDashHoja = '1';
+  document.querySelectorAll('#dashHojasBar .chip').forEach(c=>c.classList.toggle('active', c.dataset.hoja==='1'));
   renderDashboard();
   document.getElementById('dashboardModal').classList.add('open');
 });
@@ -2562,7 +2623,58 @@ function buildDashboardImageData(){
   return {topDeuda, topRecibos, buckets, sinTelIds, paretoRows, paretoAcc:acc, paretoPct};
 }
 
+// imagen simple (id + monto, sin nombres) para hoja 2 (deudores condominio) y hoja 3 (deudores proyecto)
+function exportDeudoresImage(tipo){
+  let rows, title, filename;
+  if(tipo==='condominio'){
+    rows = deudaRows.slice().sort((a,b)=>(b.monto||0)-(a.monto||0)).map(r=>({id:r.id, val:r.monto||0, suffix: r.meses!=null ? r.meses+' recibo(s)' : null}));
+    title = 'HATILLO HILL · Deudores del condominio';
+    filename = 'hatillo_hill_deudores_condominio.png';
+  } else {
+    const p = proyectos[0];
+    rows = p ? (p.aportes||[]).map(ap=>({id:ap.apt_id, val:Math.max(0,(ap.monto_aporte||0)-(ap.monto_pagado||0))})).filter(r=>r.val>0.005).sort((a,b)=>b.val-a.val) : [];
+    title = 'HATILLO HILL · Deudores de "'+(p?p.nombre:'proyecto en curso')+'"';
+    filename = 'hatillo_hill_deudores_proyecto.png';
+  }
+  const W = 640, PAD = 32, rowH = 26;
+  const H = rows.length ? (110 + rows.length*rowH + 40) : 180;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#0f1720'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = '#161f2b'; ctx.fillRect(0,0,W,70);
+  ctx.fillStyle = '#e7edf5'; ctx.font = 'bold 17px -apple-system,Segoe UI,Roboto,sans-serif';
+  ctx.fillText(title, PAD, 32);
+  ctx.fillStyle = '#94a3b8'; ctx.font = '12px -apple-system,Segoe UI,Roboto,sans-serif';
+  ctx.fillText('Generado el '+new Date().toLocaleDateString('es-VE',{year:'numeric',month:'long',day:'numeric'})+' · Solo números de apartamento, sin nombres.', PAD, 52);
+  let y = 100;
+  if(!rows.length){
+    ctx.fillStyle='#94a3b8'; ctx.font='13px sans-serif'; ctx.fillText('No hay deudores en este momento.', PAD, y);
+  } else {
+    rows.forEach(r=>{
+      ctx.fillStyle = '#e7edf5'; ctx.font = 'bold 13px -apple-system,Segoe UI,Roboto,sans-serif';
+      ctx.fillText(r.id, PAD, y);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#ef4444';
+      ctx.fillText(fmtMoney(r.val)+(r.suffix?' · '+r.suffix:''), W-PAD, y);
+      ctx.textAlign = 'left';
+      y += rowH;
+    });
+  }
+  ctx.fillStyle = '#64748b'; ctx.font = '11px -apple-system,Segoe UI,Roboto,sans-serif';
+  ctx.fillText('Junta de Condominio · Hatillo Hill', PAD, H-16);
+  canvas.toBlob(function(blob){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 'image/png');
+}
+
 function exportDashboardImage(){
+  if(currentDashHoja==='2') return exportDeudoresImage('condominio');
+  if(currentDashHoja==='3') return exportDeudoresImage('proyecto');
   const data = buildDashboardImageData();
   const W = 900, PAD = 36;
   const scratch = document.createElement('canvas').getContext('2d');
