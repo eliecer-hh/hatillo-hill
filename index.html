@@ -2519,10 +2519,10 @@ function responderConsulta(rawQuery){
   if(proyecto){
     const r = resumenAporte(proyecto);
     if(wantsSinPagarProyecto){
-      const sinPagar = (proyecto.aportes||[]).filter(a=>(a.monto_pagado||0)<=0.005);
-      if(!sinPagar.length) return 'Todos los apartamentos tienen al menos un abono registrado en "'+proyecto.nombre+'".';
+      const sinPagar = (proyecto.aportes||[]).filter(a=>(a.monto_aporte||0)>0.005 && (a.monto_pagado||0)<=0.005);
+      if(!sinPagar.length) return 'Todos los apartamentos con aporte asignado tienen al menos un abono registrado en "'+proyecto.nombre+'".';
       const nombres = sinPagar.map(a=>{ const ap=apartments.find(x=>x.id===a.apt_id); return a.apt_id+(ap&&ap.propietario?' ('+ap.propietario+')':''); });
-      return sinPagar.length+' apartamento(s) sin ningún pago en "'+proyecto.nombre+'":\n'+nombres.map(n=>'• '+n).join('\n');
+      return sinPagar.length+' apartamento(s) con aporte asignado sin ningún pago en "'+proyecto.nombre+'":\n'+nombres.map(n=>'• '+n).join('\n');
     }
     if(wantsTop){
       const conDeuda = (proyecto.aportes||[]).map(a=>({apt_id:a.apt_id, pend: Math.max(0,(a.monto_aporte||0)-(a.monto_pagado||0))})).filter(x=>x.pend>0.005).sort((a,b)=>b.pend-a.pend).slice(0,extraerTopN(qn));
