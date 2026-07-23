@@ -2533,21 +2533,29 @@ function responderConsulta(rawQuery){
 
   if(proyecto){
     const r = resumenAporte(proyecto);
+    const listaDeudoresProyecto = ()=>(proyecto.aportes||[]).map(a=>({apt_id:a.apt_id, pend: Math.max(0,(a.monto_aporte||0)-(a.monto_pagado||0))})).filter(x=>x.pend>0.005).sort((a,b)=>b.pend-a.pend);
     if(wantsSinPagarProyecto){
       const sinPagar = (proyecto.aportes||[]).filter(a=>(a.monto_aporte||0)>0.005 && (a.monto_pagado||0)<=0.005);
       if(!sinPagar.length) return 'Todos los apartamentos con aporte asignado tienen al menos un abono registrado en "'+proyecto.nombre+'".';
       const nombres = sinPagar.map(a=>{ const ap=apartments.find(x=>x.id===a.apt_id); return a.apt_id+(ap&&ap.propietario?' ('+ap.propietario+')':''); });
-      return sinPagar.length+' apartamento(s) con aporte asignado sin ningún pago en "'+proyecto.nombre+'":\n'+nombres.map(n=>'• '+n).join('\n');
+      return nombres.map(n=>'• '+n).join('\n')+'\n\nTotal: '+sinPagar.length+' apartamento(s) con aporte asignado sin ningún pago en "'+proyecto.nombre+'".';
     }
     if(wantsTop){
-      const conDeuda = (proyecto.aportes||[]).map(a=>({apt_id:a.apt_id, pend: Math.max(0,(a.monto_aporte||0)-(a.monto_pagado||0))})).filter(x=>x.pend>0.005).sort((a,b)=>b.pend-a.pend).slice(0,extraerTopN(qn));
-      if(!conDeuda.length) return 'Nadie tiene deuda pendiente en "'+proyecto.nombre+'".';
-      return 'Mayor deuda pendiente en "'+proyecto.nombre+'":\n'+conDeuda.map((x,i)=>{ const ap=apartments.find(a=>a.id===x.apt_id); return (i+1)+'. '+x.apt_id+(ap&&ap.propietario?' ('+ap.propietario+')':'')+': '+fmtMoney(x.pend); }).join('\n');
+      const todos = listaDeudoresProyecto();
+      if(!todos.length) return 'Nadie tiene deuda pendiente en "'+proyecto.nombre+'".';
+      const n = extraerTopN(qn);
+      const conDeuda = todos.slice(0,n);
+      const totalPend = todos.reduce((s,x)=>s+x.pend,0);
+      const lines = conDeuda.map((x,i)=>{ const ap=apartments.find(a=>a.id===x.apt_id); return (i+1)+'. '+x.apt_id+(ap&&ap.propietario?' ('+ap.propietario+')':'')+': '+fmtMoney(x.pend); });
+      return 'Mayor deuda pendiente en "'+proyecto.nombre+'":\n'+lines.join('\n')+'\n\nTotal: '+todos.length+' apartamento(s) con deuda pendiente en este proyecto, '+fmtMoney(totalPend)+' en total.';
     }
     if(wantsCuantos){
-      const conDeuda = (proyecto.aportes||[]).filter(a=>((a.monto_aporte||0)-(a.monto_pagado||0))>0.005).length;
-      const alDia = (proyecto.aportes||[]).length - conDeuda;
-      return 'Proyecto "'+proyecto.nombre+'": '+conDeuda+' apartamento(s) con deuda, '+alDia+' al día, de '+(proyecto.aportes||[]).length+' en total.';
+      const todos = listaDeudoresProyecto();
+      const alDia = (proyecto.aportes||[]).length - todos.length;
+      if(!todos.length) return 'Ningún apartamento tiene deuda pendiente en "'+proyecto.nombre+'".';
+      const totalPend = todos.reduce((s,x)=>s+x.pend,0);
+      const lines = todos.map(x=>{ const ap=apartments.find(a=>a.id===x.apt_id); return '• '+x.apt_id+(ap&&ap.propietario?' ('+ap.propietario+')':'')+': '+fmtMoney(x.pend); });
+      return lines.join('\n')+'\n\nTotal: '+todos.length+' apartamento(s) con deuda ('+fmtMoney(totalPend)+' pendiente), '+alDia+' al día, de '+(proyecto.aportes||[]).length+' en total.';
     }
     if(wantsRecaudado || wantsDeuda || wantsPendiente){
       return 'Proyecto "'+proyecto.nombre+'":\n• Recaudado: '+fmtMoney(r.recaudado)+' de '+fmtMoney(r.total)+' ('+r.pct+'%)\n• Pendiente: '+fmtMoney(r.pendiente);
@@ -2558,46 +2566,50 @@ function responderConsulta(rawQuery){
   const porNombre = extraerPropietario(qn);
   if(porNombre.length){
     if(porNombre.length===1) return 'El propietario coincide con el apartamento '+porNombre[0].id+'.\n'+deudaAptoTexto(porNombre[0]);
-    return 'Encontré '+porNombre.length+' apartamento(s) que coinciden:\n'+porNombre.map(a=>'• '+a.id+' — '+a.propietario).join('\n');
+    return porNombre.map(a=>'• '+a.id+' — '+a.propietario).join('\n')+'\n\nTotal: '+porNombre.length+' apartamento(s) que coinciden.';
   }
 
-  if(wantsCuantos){
+  if(wantsCuantos || wantsPropietario || wantsEstado || wantsAlDia){
     if(wantsAlDia){
       const alDia = apartments.filter(a=>{ const d=findDeuda(a); return !d || d.monto<=0.005; });
-      return alDia.length+' apartamento(s) están al día con el condominio.';
+      if(!alDia.length) return 'Ningún apartamento está al día — todos tienen deuda de condominio.';
+      return alDia.map(a=>'• '+a.id+(a.propietario?' ('+a.propietario+')':'')).join('\n')+'\n\nTotal: '+alDia.length+' apartamento(s) al día con el condominio.';
     }
     if(wantsEstado){
-      const sinEntregar = apartments.filter(a=>a.estado==='Vendido sin entregar').length;
-      const sinFirmar = apartments.filter(a=>a.estado==='Vendido sin firmar').length;
-      const entregados = apartments.length - sinEntregar - sinFirmar;
-      return 'De '+apartments.length+' apartamentos: '+entregados+' entregados, '+sinEntregar+' vendidos sin entregar, '+sinFirmar+' vendidos sin firmar.';
+      const sinEntregar = apartments.filter(a=>a.estado==='Vendido sin entregar');
+      const sinFirmar = apartments.filter(a=>a.estado==='Vendido sin firmar');
+      let out = '';
+      if(sinEntregar.length) out += 'Vendidos sin entregar:\n'+sinEntregar.map(a=>'• '+a.id+(a.propietario?' ('+a.propietario+')':'')).join('\n')+'\n\n';
+      if(sinFirmar.length) out += 'Vendidos sin firmar:\n'+sinFirmar.map(a=>'• '+a.id+(a.propietario?' ('+a.propietario+')':'')).join('\n')+'\n\n';
+      const entregados = apartments.length - sinEntregar.length - sinFirmar.length;
+      out += 'Total: '+apartments.length+' apartamento(s) — '+entregados+' entregados, '+sinEntregar.length+' vendidos sin entregar, '+sinFirmar.length+' vendidos sin firmar.';
+      return out;
     }
     if(wantsDeuda || wantsPendiente){
-      const conDeuda = apartments.filter(a=>{ const d=findDeuda(a); return d && d.monto>0.005; });
-      return conDeuda.length+' apartamento(s) tienen deuda de condominio pendiente.';
+      const conDeuda = apartments.map(a=>({a,d:findDeuda(a)})).filter(x=>x.d && x.d.monto>0.005).sort((x,y)=>y.d.monto-x.d.monto);
+      if(!conDeuda.length) return 'Ningún apartamento tiene deuda de condominio pendiente.';
+      const totalMonto = conDeuda.reduce((s,x)=>s+x.d.monto,0);
+      return conDeuda.map(x=>'• '+x.a.id+(x.a.propietario?' ('+x.a.propietario+')':'')+': '+fmtMoney(x.d.monto)).join('\n')+'\n\nTotal: '+conDeuda.length+' apartamento(s), '+fmtMoney(totalMonto)+' de deuda de condominio.';
     }
+    if(!wantsCuantos) return null;
     const sinEntregar = apartments.filter(a=>a.estado==='Vendido sin entregar').length;
     const sinFirmar = apartments.filter(a=>a.estado==='Vendido sin firmar').length;
     const entregados = apartments.length - sinEntregar - sinFirmar;
-    return 'De '+apartments.length+' apartamentos: '+entregados+' entregados, '+sinEntregar+' vendidos sin entregar, '+sinFirmar+' vendidos sin firmar.';
-  }
-  if(wantsEstado){
-    const sinEntregar = apartments.filter(a=>a.estado==='Vendido sin entregar');
-    const sinFirmar = apartments.filter(a=>a.estado==='Vendido sin firmar');
-    let out = '';
-    if(sinEntregar.length) out += 'Vendidos sin entregar: '+sinEntregar.map(a=>a.id).join(', ')+'\n';
-    if(sinFirmar.length) out += 'Vendidos sin firmar: '+sinFirmar.map(a=>a.id).join(', ');
-    return out.trim() || 'Todos los apartamentos están entregados.';
+    return 'Total: '+apartments.length+' apartamentos — '+entregados+' entregados, '+sinEntregar+' vendidos sin entregar, '+sinFirmar+' vendidos sin firmar.';
   }
   if(wantsTop){
-    const conDeuda = apartments.map(a=>({a, d:findDeuda(a)})).filter(x=>x.d && x.d.monto>0.005).sort((x,y)=>y.d.monto-x.d.monto).slice(0,extraerTopN(qn));
-    if(!conDeuda.length) return 'Nadie tiene deuda de condominio pendiente.';
-    return 'Mayor deuda de condominio:\n'+conDeuda.map((x,i)=>(i+1)+'. '+x.a.id+(x.a.propietario?' ('+x.a.propietario+')':'')+': '+fmtMoney(x.d.monto)).join('\n');
+    const todos = apartments.map(a=>({a, d:findDeuda(a)})).filter(x=>x.d && x.d.monto>0.005).sort((x,y)=>y.d.monto-x.d.monto);
+    if(!todos.length) return 'Nadie tiene deuda de condominio pendiente.';
+    const n = extraerTopN(qn);
+    const conDeuda = todos.slice(0,n);
+    const totalMonto = todos.reduce((s,x)=>s+x.d.monto,0);
+    return 'Mayor deuda de condominio:\n'+conDeuda.map((x,i)=>(i+1)+'. '+x.a.id+(x.a.propietario?' ('+x.a.propietario+')':'')+': '+fmtMoney(x.d.monto)).join('\n')+'\n\nTotal: '+todos.length+' apartamento(s) con deuda de condominio, '+fmtMoney(totalMonto)+' en total.';
   }
   if(wantsDeuda || wantsPendiente){
-    const conDeuda = apartments.filter(a=>{ const d=findDeuda(a); return d && d.monto>0.005; });
+    const conDeuda = apartments.map(a=>({a,d:findDeuda(a)})).filter(x=>x.d && x.d.monto>0.005).sort((x,y)=>y.d.monto-x.d.monto);
     const totalDeudaCond = deudaRows.reduce((s,r)=>s+(r.monto||0),0);
-    return 'Deuda total de condominio: '+fmtMoney(totalDeudaCond)+' en '+conDeuda.length+' apartamento(s).';
+    if(!conDeuda.length) return 'Ningún apartamento tiene deuda de condominio pendiente.';
+    return conDeuda.map(x=>'• '+x.a.id+(x.a.propietario?' ('+x.a.propietario+')':'')+': '+fmtMoney(x.d.monto)).join('\n')+'\n\nTotal: '+fmtMoney(totalDeudaCond)+' de deuda de condominio en '+conDeuda.length+' apartamento(s).';
   }
 
   return null;
