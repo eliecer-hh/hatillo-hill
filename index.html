@@ -183,6 +183,7 @@
       <div class="chipbar" id="deudaBar"><button class="chip deudachip active">Todos</button><button class="chip deudachip">Con deuda</button><button class="chip deudachip">Sin deuda</button></div>
       <div class="chipbar"><button class="chip" id="btnOpenDashboard" style="background:var(--accent);color:#fff;">📊 Dashboard</button></div>
       <div class="chipbar" id="driveBar"><button class="chip" id="btnDriveConnect" style="background:#3b82f6;color:#fff;">☁️ Conectar Google Drive</button></div>
+      <div class="chipbar" id="localBackupBar"><button class="chip" id="btnLocalBackup" style="background:#3b82f6;color:#fff;" title="Elige o crea una carpeta (ej. &quot;sistema hatillo hill&quot;) donde se guarda un único archivo de datos que se sobrescribe con cada cambio.">🗂️ Activar respaldo local</button></div>
       <div id="consultaBar">
         <input type="text" id="consultaInput" placeholder="Pregunta lo que sea: deuda de A2-3, recaudado del pozo, quién no ha pagado, resumen...">
         <button id="btnConsultaEjemplos" title="Ver ejemplos de preguntas">💡 Ejemplos</button>
@@ -437,6 +438,11 @@ async function driveSyncPull(){
     if(typeof rebuildScene==='function') rebuildScene();
     renderSidebar();
     setDriveStatus('connected','Sincronizado con Drive');
+    writeLocalBackupNow({
+      apartments, parking, maleteros, deudaRows, deudaHistorial, proyectos,
+      whatsappTemplateGeneral, whatsappTemplateCobro,
+      recordatorioFrecuenciaDias, preferWhatsappEscritorio
+    });
   }catch(e){
     console.error(e);
     setDriveStatus('error','No se pudo sincronizar con Drive (revisa tu conexión)');
@@ -478,6 +484,113 @@ waitForGIS(function(){
   if(btn) btn.addEventListener('click', ()=>{ driveTokenClient.requestAccessToken(); });
 });
 
+// ---------- respaldo local automático (carpeta elegida por el usuario, un solo archivo que se sobrescribe) ----------
+// Usa File System Access API (Chrome/Edge de escritorio). El handle de la carpeta se guarda en IndexedDB
+// para no tener que volver a elegirla en cada sesión; el permiso puede requerir reconfirmarse con un clic.
+const LOCAL_BACKUP_DB = 'hatillo_hill_backup_db';
+const LOCAL_BACKUP_STORE = 'handles';
+const LOCAL_BACKUP_KEY = 'sistema_hatillo_hill_dir';
+const LOCAL_BACKUP_FILENAME = 'hatillo_hill_datos.json';
+let localBackupDirHandle = null;
+
+function idbOpen(){
+  return new Promise((resolve, reject)=>{
+    const req = indexedDB.open(LOCAL_BACKUP_DB, 1);
+    req.onupgradeneeded = ()=>{ req.result.createObjectStore(LOCAL_BACKUP_STORE); };
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function idbSet(key, val){
+  const db = await idbOpen();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(LOCAL_BACKUP_STORE, 'readwrite');
+    tx.objectStore(LOCAL_BACKUP_STORE).put(val, key);
+    tx.oncomplete = ()=> resolve();
+    tx.onerror = ()=> reject(tx.error);
+  });
+}
+async function idbGet(key){
+  const db = await idbOpen();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(LOCAL_BACKUP_STORE, 'readonly');
+    const req = tx.objectStore(LOCAL_BACKUP_STORE).get(key);
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+
+function setLocalBackupStatus(state){
+  const btn = document.getElementById('btnLocalBackup');
+  if(!btn) return;
+  const colors = {disconnected:'#3b82f6', connected:'#10b981', needsperm:'#f59e0b', error:'#ef4444', unsupported:'#64748b'};
+  const labels = {
+    disconnected: '🗂️ Activar respaldo local',
+    connected: '🗂️ Respaldo local activo',
+    needsperm: '🗂️ Reautorizar carpeta local',
+    error: '🗂️ Error de respaldo local (toca para reintentar)',
+    unsupported: '🗂️ Respaldo local no disponible en este navegador'
+  };
+  btn.style.background = colors[state] || colors.disconnected;
+  btn.textContent = labels[state] || labels.disconnected;
+}
+
+async function writeLocalBackupNow(snap){
+  if(!localBackupDirHandle) return;
+  try{
+    const perm = await localBackupDirHandle.queryPermission({mode:'readwrite'});
+    if(perm!=='granted'){ setLocalBackupStatus('needsperm'); return; }
+    const fileHandle = await localBackupDirHandle.getFileHandle(LOCAL_BACKUP_FILENAME, {create:true});
+    const writable = await fileHandle.createWritable(); // sobrescribe el archivo por completo, no acumula copias
+    await writable.write(JSON.stringify(snap, null, 2));
+    await writable.close();
+    setLocalBackupStatus('connected');
+  }catch(e){
+    console.error(e);
+    setLocalBackupStatus('error');
+  }
+}
+
+async function restoreLocalBackupFolder(){
+  if(!window.showDirectoryPicker){ setLocalBackupStatus('unsupported'); return; }
+  try{
+    const handle = await idbGet(LOCAL_BACKUP_KEY);
+    if(!handle){ setLocalBackupStatus('disconnected'); return; }
+    const perm = await handle.queryPermission({mode:'readwrite'});
+    if(perm==='granted'){
+      localBackupDirHandle = handle;
+      setLocalBackupStatus('connected');
+    } else {
+      setLocalBackupStatus('needsperm');
+    }
+  }catch(e){ console.error(e); setLocalBackupStatus('disconnected'); }
+}
+
+async function activateLocalBackup(){
+  if(!window.showDirectoryPicker){
+    alert('Este navegador no soporta guardar el respaldo local automáticamente (funciona en Chrome o Edge de escritorio). La sincronización con Google Drive sigue funcionando normal.');
+    return;
+  }
+  try{
+    let handle = localBackupDirHandle || await idbGet(LOCAL_BACKUP_KEY);
+    if(handle){
+      const perm = await handle.requestPermission({mode:'readwrite'});
+      if(perm!=='granted') handle = null;
+    }
+    if(!handle){
+      handle = await window.showDirectoryPicker({mode:'readwrite'});
+      await idbSet(LOCAL_BACKUP_KEY, handle);
+    }
+    localBackupDirHandle = handle;
+    setLocalBackupStatus('connected');
+    await saveFullSnapshot();
+  }catch(e){
+    if(e.name!=='AbortError'){ console.error(e); setLocalBackupStatus('error'); }
+  }
+}
+document.getElementById('btnLocalBackup').addEventListener('click', activateLocalBackup);
+restoreLocalBackupFolder();
+
 // ---------- persistence ----------
 // El archivo publicado en GitHub Pages no trae datos reales de residentes (privacidad):
 // arranca con arreglos vacíos y, si existe un "full_snapshot" en Drive/localStorage
@@ -490,6 +603,7 @@ async function saveFullSnapshot(){
     recordatorioFrecuenciaDias, preferWhatsappEscritorio
   };
   try{ await window.storage.set(FULL_SNAPSHOT_KEY, JSON.stringify(snap)); }catch(e){ console.error(e); }
+  writeLocalBackupNow(snap);
 }
 
 async function loadOverrides(){
