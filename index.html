@@ -304,6 +304,9 @@ let filterSotano = null; // '1' | '2' | '3' | null
 let filterDeuda = null; // 'con' | 'sin' | null
 let selected = null; // {type:'apt'|'park'|'malet', ref}
 let fichaEditMode = false; // controla si la ficha flotante del apartamento está en modo edición o solo lectura
+// controla si las secciones opcionales de la ficha (mascotas/inquilino/segundo contacto) están
+// desplegadas; arrancan colapsadas (solo un boton "+ Agregar...") si el apto no tiene datos ahi
+let fichaSections = {mascotas:false, inquilino:false, contacto2:false};
 let currentTab = 'lista';
 let selectedProyectoId = null;
 let pendingPagoAptId = null; // apto a preseleccionar en "Registrar abono" al llegar desde el boton "Pagar" de la Lista
@@ -1858,6 +1861,11 @@ function renderEditarTab(body){
 function openFichaApt(apt){
   selected = {type:'apt', ref:apt};
   fichaEditMode = false;
+  fichaSections = {
+    contacto2: !!(apt.contacto2_nombre || apt.contacto2_telefono || apt.contacto2_correo),
+    inquilino: !!(apt.alquilado || apt.inquilino_nombre || apt.inquilino_telefono),
+    mascotas: !!(apt.mascotas_propietario || apt.mascotas_inquilino)
+  };
   document.getElementById('fichaTitulo').textContent = apt.id;
   renderFichaBody();
   const modal = document.getElementById('fichaModal');
@@ -1872,6 +1880,39 @@ function renderFichaBody(){
   const d = findDeuda(apt);
   const dis = fichaEditMode ? '' : 'disabled';
   const body = document.getElementById('fichaBody');
+
+  const contacto2Html = fichaSections.contacto2 ? `
+    <h3 class="section">Segundo contacto</h3>
+    <div class="form-row"><label>Nombre</label><input id="fm_contacto2_nombre" value="${esc(apt.contacto2_nombre)}" ${dis}></div>
+    <div class="form-row"><label>Teléfono (WhatsApp)</label><input id="fm_contacto2_telefono" value="${esc(apt.contacto2_telefono)}" placeholder="Ej: 584121234567" ${dis}></div>
+    <div class="form-row"><label>Correo</label><input id="fm_contacto2_correo" type="email" value="${esc(apt.contacto2_correo)}" ${dis}></div>
+    ${fichaEditMode ? '<button type="button" class="btn ghost" id="btnQuitarContacto2" style="font-size:11px;">✕ Quitar segundo contacto</button>' : ''}
+  ` : (fichaEditMode ? '<h3 class="section">Segundo contacto</h3><button type="button" class="btn ghost" id="btnAgregarContacto2">➕ Agregar segundo contacto</button>' : '');
+
+  const mascotasHtml = fichaSections.mascotas ? `
+    <h3 class="section">Mascotas</h3>
+    <div class="form-row"><label><input type="checkbox" id="fm_mascotas_propietario" ${apt.mascotas_propietario?'checked':''} ${dis} style="width:auto;margin-right:6px;vertical-align:middle;">El propietario tiene mascota(s)</label></div>
+    <div class="form-row two">
+      <div><label>Tipo</label><input id="fm_mascotas_propietario_tipo" value="${esc(apt.mascotas_propietario_tipo)}" ${dis}></div>
+      <div><label>Cantidad</label><input id="fm_mascotas_propietario_cantidad" type="number" value="${apt.mascotas_propietario_cantidad!=null?apt.mascotas_propietario_cantidad:''}" ${dis}></div>
+    </div>
+    <div class="form-row"><label><input type="checkbox" id="fm_mascotas_inquilino" ${apt.mascotas_inquilino?'checked':''} ${dis} style="width:auto;margin-right:6px;vertical-align:middle;">El inquilino tiene mascota(s)</label></div>
+    <div class="form-row two">
+      <div><label>Tipo</label><input id="fm_mascotas_inquilino_tipo" value="${esc(apt.mascotas_inquilino_tipo)}" ${dis}></div>
+      <div><label>Cantidad</label><input id="fm_mascotas_inquilino_cantidad" type="number" value="${apt.mascotas_inquilino_cantidad!=null?apt.mascotas_inquilino_cantidad:''}" ${dis}></div>
+    </div>
+    ${fichaEditMode ? '<button type="button" class="btn ghost" id="btnQuitarMascotas" style="font-size:11px;">✕ Quitar mascotas</button>' : ''}
+  ` : (fichaEditMode ? '<h3 class="section">Mascotas</h3><button type="button" class="btn ghost" id="btnAgregarMascotas">➕ Agregar mascota</button>' : '');
+
+  const inquilinoHtml = fichaSections.inquilino ? `
+    <h3 class="section">Inquilino</h3>
+    <div class="form-row"><label><input type="checkbox" id="fm_alquilado" ${apt.alquilado?'checked':''} ${dis} style="width:auto;margin-right:6px;vertical-align:middle;">Apartamento alquilado</label></div>
+    <div class="form-row"><label>Nombre del inquilino</label><input id="fm_inquilino_nombre" value="${esc(apt.inquilino_nombre)}" ${dis}></div>
+    <div class="form-row"><label>Teléfono del inquilino</label><input id="fm_inquilino_telefono" value="${esc(apt.inquilino_telefono)}" placeholder="Ej: 584121234567" ${dis}></div>
+    <div class="form-row"><label>Correo del inquilino</label><input id="fm_inquilino_correo" type="email" value="${esc(apt.inquilino_correo)}" ${dis}></div>
+    ${fichaEditMode ? '<button type="button" class="btn ghost" id="btnQuitarInquilino" style="font-size:11px;">✕ Quitar inquilino</button>' : ''}
+  ` : (fichaEditMode ? '<h3 class="section">Inquilino</h3><button type="button" class="btn ghost" id="btnAgregarInquilino">➕ Agregar inquilino</button>' : '');
+
   body.innerHTML = `
     <h3 class="section">Datos generales</h3>
     <div class="form-row"><label>Propietario</label><input id="fm_propietario" value="${esc(apt.propietario)}" ${dis}></div>
@@ -1891,13 +1932,9 @@ function renderFichaBody(){
     <h3 class="section">Acceso portón (app Shelly)</h3>
     <div class="form-row"><label>Sótano asignado</label><input id="fm_sotano" value="${esc(apt.sotano)}" placeholder="Ej: 1, 2 o 3" ${dis}></div>
     <div class="form-row"><label><input type="checkbox" id="fm_shelly" ${apt.shelly?'checked':''} ${dis} style="width:auto;margin-right:6px;vertical-align:middle;">Ya tiene la app Shelly (portón principal / sótano)</label></div>
-    <h3 class="section">Segundo contacto</h3>
-    <div class="form-row"><label>Nombre</label><input id="fm_contacto2_nombre" value="${esc(apt.contacto2_nombre)}" ${dis}></div>
-    <div class="form-row"><label>Teléfono (WhatsApp)</label><input id="fm_contacto2_telefono" value="${esc(apt.contacto2_telefono)}" placeholder="Ej: 584121234567" ${dis}></div>
-    <h3 class="section">Alquiler</h3>
-    <div class="form-row"><label><input type="checkbox" id="fm_alquilado" ${apt.alquilado?'checked':''} ${dis} style="width:auto;margin-right:6px;vertical-align:middle;">Apartamento alquilado</label></div>
-    <div class="form-row"><label>Nombre del inquilino</label><input id="fm_inquilino_nombre" value="${esc(apt.inquilino_nombre)}" ${dis}></div>
-    <div class="form-row"><label>Teléfono del inquilino</label><input id="fm_inquilino_telefono" value="${esc(apt.inquilino_telefono)}" placeholder="Ej: 584121234567" ${dis}></div>
+    ${contacto2Html}
+    ${mascotasHtml}
+    ${inquilinoHtml}
     <h3 class="section">Superficies</h3>
     <div class="form-row two">
       <div><label>Construcción (m²)</label><input id="fm_constr" type="number" step="0.01" value="${apt.construccion!=null?apt.construccion:''}" ${dis}></div>
@@ -1926,6 +1963,19 @@ function renderFichaBody(){
     camTarget.set(0, y+1.5, zSign*4); camRadius=16; camPhi=0.95;
     updateCamera();
   };
+  const toggleSection = (key)=>{ fichaSections[key] = !fichaSections[key]; renderFichaBody(); };
+  const btnAgregarContacto2 = document.getElementById('btnAgregarContacto2');
+  if(btnAgregarContacto2) btnAgregarContacto2.onclick = ()=>toggleSection('contacto2');
+  const btnQuitarContacto2 = document.getElementById('btnQuitarContacto2');
+  if(btnQuitarContacto2) btnQuitarContacto2.onclick = ()=>toggleSection('contacto2');
+  const btnAgregarMascotas = document.getElementById('btnAgregarMascotas');
+  if(btnAgregarMascotas) btnAgregarMascotas.onclick = ()=>toggleSection('mascotas');
+  const btnQuitarMascotas = document.getElementById('btnQuitarMascotas');
+  if(btnQuitarMascotas) btnQuitarMascotas.onclick = ()=>toggleSection('mascotas');
+  const btnAgregarInquilino = document.getElementById('btnAgregarInquilino');
+  if(btnAgregarInquilino) btnAgregarInquilino.onclick = ()=>toggleSection('inquilino');
+  const btnQuitarInquilino = document.getElementById('btnQuitarInquilino');
+  if(btnQuitarInquilino) btnQuitarInquilino.onclick = ()=>toggleSection('inquilino');
   document.getElementById('btnEditarFicha').style.display = fichaEditMode ? 'none' : '';
   document.getElementById('btnGuardarFicha').style.display = fichaEditMode ? '' : 'none';
 }
@@ -3174,11 +3224,32 @@ document.getElementById('btnGuardarFicha').addEventListener('click', async ()=>{
   apt.estado = document.getElementById('fm_estado').value || null;
   apt.sotano = document.getElementById('fm_sotano').value.trim() || null;
   apt.shelly = document.getElementById('fm_shelly').checked;
-  apt.contacto2_nombre = document.getElementById('fm_contacto2_nombre').value.trim() || null;
-  apt.contacto2_telefono = document.getElementById('fm_contacto2_telefono').value.trim() || null;
-  apt.alquilado = document.getElementById('fm_alquilado').checked;
-  apt.inquilino_nombre = document.getElementById('fm_inquilino_nombre').value.trim() || null;
-  apt.inquilino_telefono = document.getElementById('fm_inquilino_telefono').value.trim() || null;
+  if(fichaSections.contacto2){
+    apt.contacto2_nombre = document.getElementById('fm_contacto2_nombre').value.trim() || null;
+    apt.contacto2_telefono = document.getElementById('fm_contacto2_telefono').value.trim() || null;
+    apt.contacto2_correo = document.getElementById('fm_contacto2_correo').value.trim() || null;
+  } else {
+    apt.contacto2_nombre = null; apt.contacto2_telefono = null; apt.contacto2_correo = null;
+  }
+  if(fichaSections.mascotas){
+    apt.mascotas_propietario = document.getElementById('fm_mascotas_propietario').checked;
+    apt.mascotas_propietario_tipo = document.getElementById('fm_mascotas_propietario_tipo').value.trim() || null;
+    apt.mascotas_propietario_cantidad = parseFloat(document.getElementById('fm_mascotas_propietario_cantidad').value) || null;
+    apt.mascotas_inquilino = document.getElementById('fm_mascotas_inquilino').checked;
+    apt.mascotas_inquilino_tipo = document.getElementById('fm_mascotas_inquilino_tipo').value.trim() || null;
+    apt.mascotas_inquilino_cantidad = parseFloat(document.getElementById('fm_mascotas_inquilino_cantidad').value) || null;
+  } else {
+    apt.mascotas_propietario = false; apt.mascotas_propietario_tipo = null; apt.mascotas_propietario_cantidad = null;
+    apt.mascotas_inquilino = false; apt.mascotas_inquilino_tipo = null; apt.mascotas_inquilino_cantidad = null;
+  }
+  if(fichaSections.inquilino){
+    apt.alquilado = document.getElementById('fm_alquilado').checked;
+    apt.inquilino_nombre = document.getElementById('fm_inquilino_nombre').value.trim() || null;
+    apt.inquilino_telefono = document.getElementById('fm_inquilino_telefono').value.trim() || null;
+    apt.inquilino_correo = document.getElementById('fm_inquilino_correo').value.trim() || null;
+  } else {
+    apt.alquilado = false; apt.inquilino_nombre = null; apt.inquilino_telefono = null; apt.inquilino_correo = null;
+  }
   apt.construccion = parseFloat(document.getElementById('fm_constr').value) || null;
   apt.terraza = parseFloat(document.getElementById('fm_terraza').value) || null;
   apt.total_m2 = parseFloat(document.getElementById('fm_totalm2').value) || null;
