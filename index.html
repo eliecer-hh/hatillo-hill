@@ -1896,11 +1896,13 @@ function renderFichaBody(){
       <div><label>Tipo</label><input id="fm_mascotas_propietario_tipo" value="${esc(apt.mascotas_propietario_tipo)}" ${dis}></div>
       <div><label>Cantidad</label><input id="fm_mascotas_propietario_cantidad" type="number" value="${apt.mascotas_propietario_cantidad!=null?apt.mascotas_propietario_cantidad:''}" ${dis}></div>
     </div>
+    ${fichaSections.inquilino ? `
     <div class="form-row"><label><input type="checkbox" id="fm_mascotas_inquilino" ${apt.mascotas_inquilino?'checked':''} ${dis} style="width:auto;margin-right:6px;vertical-align:middle;">El inquilino tiene mascota(s)</label></div>
     <div class="form-row two">
       <div><label>Tipo</label><input id="fm_mascotas_inquilino_tipo" value="${esc(apt.mascotas_inquilino_tipo)}" ${dis}></div>
       <div><label>Cantidad</label><input id="fm_mascotas_inquilino_cantidad" type="number" value="${apt.mascotas_inquilino_cantidad!=null?apt.mascotas_inquilino_cantidad:''}" ${dis}></div>
     </div>
+    ` : ''}
     ${fichaEditMode ? '<button type="button" class="btn ghost" id="btnQuitarMascotas" style="font-size:11px;">✕ Quitar mascotas</button>' : ''}
   ` : (fichaEditMode ? '<h3 class="section">Mascotas</h3><button type="button" class="btn ghost" id="btnAgregarMascotas">➕ Agregar mascota</button>' : '');
 
@@ -3235,11 +3237,14 @@ document.getElementById('btnGuardarFicha').addEventListener('click', async ()=>{
     apt.mascotas_propietario = document.getElementById('fm_mascotas_propietario').checked;
     apt.mascotas_propietario_tipo = document.getElementById('fm_mascotas_propietario_tipo').value.trim() || null;
     apt.mascotas_propietario_cantidad = parseFloat(document.getElementById('fm_mascotas_propietario_cantidad').value) || null;
+  } else {
+    apt.mascotas_propietario = false; apt.mascotas_propietario_tipo = null; apt.mascotas_propietario_cantidad = null;
+  }
+  if(fichaSections.mascotas && fichaSections.inquilino){
     apt.mascotas_inquilino = document.getElementById('fm_mascotas_inquilino').checked;
     apt.mascotas_inquilino_tipo = document.getElementById('fm_mascotas_inquilino_tipo').value.trim() || null;
     apt.mascotas_inquilino_cantidad = parseFloat(document.getElementById('fm_mascotas_inquilino_cantidad').value) || null;
   } else {
-    apt.mascotas_propietario = false; apt.mascotas_propietario_tipo = null; apt.mascotas_propietario_cantidad = null;
     apt.mascotas_inquilino = false; apt.mascotas_inquilino_tipo = null; apt.mascotas_inquilino_cantidad = null;
   }
   if(fichaSections.inquilino){
