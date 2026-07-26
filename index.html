@@ -134,6 +134,15 @@
   @media (max-width:760px){ .dashGrid{grid-template-columns:1fr;} .dashCard{padding:16px;} }
   .dashWidget{background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:14px;}
   .dashWidget h3{margin:0 0 10px 0;font-size:12.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--sub);}
+  .statTiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+  .statTile{background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:14px;}
+  .statTile .stLabel{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--sub);margin-bottom:6px;font-weight:700;}
+  .statTile .stValue{font-size:23px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1;}
+  .statTile .stSub{font-size:11px;color:var(--sub);margin-top:3px;}
+  .statTile.ok .stValue{color:var(--green);}
+  .statTile.danger .stValue{color:var(--red);}
+  .statTile.accent .stValue{color:var(--accent);}
+  @media (max-width:760px){ .statTiles{grid-template-columns:1fr 1fr;} }
   .dashRow{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;padding:5px 0;border-bottom:1px dashed var(--border);gap:8px;}
   .dashRow:last-child{border-bottom:none;}
   .dashRank{color:var(--sub);font-weight:700;width:18px;flex:0 0 18px;}
@@ -200,14 +209,14 @@
       </div>
     </div>
     <div id="legend">
-      <div class="row"><span class="sw" style="background:#3b82f6"></span> Piso PB</div>
-      <div class="row"><span class="sw" style="background:#10b981"></span> Piso 1</div>
-      <div class="row"><span class="sw" style="background:#e5e7eb"></span> Piso 2</div>
-      <div class="row"><span class="sw" style="background:#f97316"></span> Piso 3</div>
-      <div class="row"><span class="sw" style="background:#9ca3af"></span> Piso PH</div>
-      <div class="row"><span class="sw" style="background:#64748b"></span> Puesto estac.</div>
-      <div class="row"><span class="sw" style="background:#a16207"></span> Maletero</div>
-      <div class="row"><span class="sw" style="background:#ef4444"></span> Seleccionado</div>
+      <div class="row"><span class="sw" style="background:#9fb8c4"></span> Piso PB</div>
+      <div class="row"><span class="sw" style="background:#9fc2a8"></span> Piso 1</div>
+      <div class="row"><span class="sw" style="background:#e8e3d5"></span> Piso 2</div>
+      <div class="row"><span class="sw" style="background:#c9a668"></span> Piso 3</div>
+      <div class="row"><span class="sw" style="background:#b0a99c"></span> Piso PH</div>
+      <div class="row"><span class="sw" style="background:#9a958a"></span> Puesto estac.</div>
+      <div class="row"><span class="sw" style="background:#8a5a2b"></span> Maletero</div>
+      <div class="row"><span class="sw" style="background:#0a84ff"></span> Seleccionado</div>
     </div>
     <div id="hint">Arrastra para rotar · rueda para zoom · clic en un elemento para editarlo</div>
     <div id="tooltip" style="display: none; left: 814px; top: 491.4px;"><b>Puesto #7</b> · Estacionamiento</div>
@@ -889,15 +898,15 @@ function makeSkyTexture(){
   const c = document.createElement('canvas'); c.width=2; c.height=256;
   const ctx = c.getContext('2d');
   const g = ctx.createLinearGradient(0,0,0,256);
-  g.addColorStop(0, '#eae2d2');
-  g.addColorStop(0.45, '#f0e9db');
-  g.addColorStop(0.75, '#f6f1e6');
-  g.addColorStop(1, '#faf7f0');
+  g.addColorStop(0, '#050a14');
+  g.addColorStop(0.45, '#0a1526');
+  g.addColorStop(0.75, '#122036');
+  g.addColorStop(1, '#1b2c44');
   ctx.fillStyle = g; ctx.fillRect(0,0,2,256);
   return new THREE.CanvasTexture(c);
 }
 scene.background = makeSkyTexture();
-scene.fog = new THREE.Fog(0xe4dccb, 45, 120);
+scene.fog = new THREE.Fog(0x0a1526, 45, 130);
 
 const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 500);
 let camTarget = new THREE.Vector3(0,6,0);
@@ -911,9 +920,9 @@ function updateCamera(){
 }
 updateCamera();
 
-scene.add(new THREE.HemisphereLight(0x8fa8cc, 0x2a2318, 0.55));
-scene.add(new THREE.AmbientLight(0xffffff, 0.25));
-const dirLight = new THREE.DirectionalLight(0xfff2dd, 1.05);
+scene.add(new THREE.HemisphereLight(0x2a4a7a, 0x0a1220, 0.55));
+scene.add(new THREE.AmbientLight(0xdbe8ff, 0.22));
+const dirLight = new THREE.DirectionalLight(0xdbe8ff, 0.85);
 dirLight.position.set(20,30,15);
 dirLight.castShadow = true;
 dirLight.shadow.mapSize.set(2048,2048);
@@ -941,10 +950,10 @@ const GROUND_Y = -(NUM_SOTANOS+1)*FLOOR_H; // debajo del ultimo sotano, para que
 function makeGroundTexture(){
   const c = document.createElement('canvas'); c.width=256; c.height=256;
   const ctx = c.getContext('2d');
-  ctx.fillStyle = '#2f5a2e'; ctx.fillRect(0,0,256,256);
+  ctx.fillStyle = '#0c1420'; ctx.fillRect(0,0,256,256);
   for(let i=0;i<900;i++){
     const x = Math.random()*256, y = Math.random()*256;
-    const shade = Math.random()>0.5 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.08)';
+    const shade = Math.random()>0.5 ? 'rgba(159,212,255,0.05)' : 'rgba(0,0,0,0.15)';
     ctx.fillStyle = shade;
     ctx.fillRect(x, y, 2, 2);
   }
@@ -987,8 +996,8 @@ const FACADE_TEX = makeFacadeTexture();
 function makeCaladoTexture(){
   const c = document.createElement('canvas'); c.width=128; c.height=64;
   const ctx = c.getContext('2d');
-  ctx.fillStyle = '#8f4a2c'; ctx.fillRect(0,0,128,64);
-  ctx.fillStyle = '#5f2f1a';
+  ctx.fillStyle = '#16283f'; ctx.fillRect(0,0,128,64);
+  ctx.fillStyle = '#0a1626';
   for(let y=6;y<64;y+=16){
     for(let x=6;x<128;x+=16){
       ctx.fillRect(x,y,9,9);
@@ -1003,7 +1012,7 @@ const CALADO_TEX = makeCaladoTexture();
 
 // ground (colocado bajo el ultimo sotano para que los sotanos se vean igual que los pisos)
 const groundGeo = new THREE.PlaneGeometry(160,160);
-const groundMat = new THREE.MeshStandardMaterial({map:makeGroundTexture(), color:0x8fae7a, roughness:1});
+const groundMat = new THREE.MeshStandardMaterial({map:makeGroundTexture(), color:0x8fa5c4, roughness:1});
 const ground = new THREE.Mesh(groundGeo, groundMat);
 ground.rotation.x = -Math.PI/2;
 ground.position.y = GROUND_Y;
@@ -1182,7 +1191,7 @@ function buildScene(){
         const geo = new THREE.BoxGeometry(CELL_W*0.92, h, CELL_D*0.92);
         const mat = isSel
           ? new THREE.MeshStandardMaterial({ color: HILITE_COLOR, roughness:0.4, metalness:0.05, emissive: HILITE_COLOR, emissiveIntensity: 1.1 })
-          : new THREE.MeshStandardMaterial({ map: FACADE_TEX, color: 0xffffff, roughness:0.75, metalness:0.02 });
+          : new THREE.MeshStandardMaterial({ color: 0x0e1f38, roughness:0.35, metalness:0.15, emissive: 0x0a1830, emissiveIntensity: 0.35 });
         const mesh = new THREE.Mesh(geo, mat);
         mesh.position.set(colX, y+h/2, pz);
         mesh.castShadow = true;
@@ -1190,6 +1199,10 @@ function buildScene(){
         mesh.userData = {type:'apt', ref:apt};
         objectsGroup.add(mesh);
         raycastTargets.push(mesh);
+        // lineas de borde brillantes (estilo plano/holograma arquitectonico)
+        const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({color: isSel?0xffffff:0x9fd4ff, transparent:true, opacity: isSel?0.95:0.75}));
+        edges.position.copy(mesh.position);
+        objectsGroup.add(edges);
 
         // franja de color por piso (mantiene el codigo visual PB/1/2/3/PH sobre la fachada realista)
         if(!isSel){
@@ -1260,7 +1273,7 @@ function buildScene(){
     const halfSpan = CORE_OFFSET;
     const archHeight = CORE_OFFSET*0.85;
     const segments = 16;
-    const archMat = new THREE.MeshStandardMaterial({color:0xe8e3d5, roughness:0.55, metalness:0.05});
+    const archMat = new THREE.MeshStandardMaterial({color:0x1c2d47, roughness:0.4, metalness:0.15});
     const segLen = (Math.PI*halfSpan/segments)*1.2;
     for(let i=0;i<=segments;i++){
       const t = i/segments;
@@ -1328,7 +1341,7 @@ function buildScene(){
       objectsGroup.add(wallRight);
     })();
 
-    const lbl = makeTextSprite('Sótano '+sKey, {fontSize:30, color:'#94a3b8'});
+    const lbl = makeTextSprite('Sótano '+sKey, {fontSize:30, color:'#8c8579'});
     lbl.position.set(-totalW/2-1.8, y+0.5, 0);
     objectsGroup.add(lbl);
     floorLabelSprites.push({sprite:lbl, piso:'SOTANO'+sKey});
@@ -1764,7 +1777,7 @@ function renderList(body, q){
       const card=document.createElement('div');
       card.className='card';
       card.innerHTML = '<div class="idrow"><span class="idlabel">'+(it.kind==='park'?'Puesto #':'Maletero #')+it.numero+'</span>'+
-        '<span class="badge" style="background:rgba(100,116,139,.18);color:#94a3b8;">'+(it.kind==='park'?'Estac.':'Maletero')+'</span></div>'+
+        '<span class="badge" style="background:rgba(100,116,139,.18);color:#8c8579;">'+(it.kind==='park'?'Estac.':'Maletero')+'</span></div>'+
         '<div class="meta">'+(it.m2||'-')+' m² · alícuota '+(it.alicuota||0)+'</div>';
       card.onclick=()=>{ selected={type:it.kind, ref: it.kind==='park'? parking.find(p=>String(p.numero)===String(it.numero)) : maleteros.find(m=>String(m.numero)===String(it.numero))}; currentTab='editar'; renderSidebar(); buildScene(); };
       listHost.appendChild(card);
@@ -1782,8 +1795,8 @@ function renderList(body, q){
     const d = findDeuda(a);
     const projDebts = proyectoDeudas(a.id);
     const tieneDeuda = !!d || projDebts.length>0;
-    const deudaHtml = d ? '<div class="meta" style="color:#ef4444;">Deuda condominio: $'+(d.monto!=null?d.monto:'-')+(d.meses!=null?' ('+d.meses+' m)':'')+'</div>' : '';
-    const projDebtHtml = projDebts.map(pd=>'<div class="meta" style="color:#f59e0b;">'+esc(pd.nombre)+': $'+pd.monto.toFixed(2)+' pendiente</div>').join('');
+    const deudaHtml = d ? '<div class="meta" style="color:#c1503f;">Deuda condominio: $'+(d.monto!=null?d.monto:'-')+(d.meses!=null?' ('+d.meses+' m)':'')+'</div>' : '';
+    const projDebtHtml = projDebts.map(pd=>'<div class="meta" style="color:#c9772f;">'+esc(pd.nombre)+': $'+pd.monto.toFixed(2)+' pendiente</div>').join('');
     const dIcon = tieneDeuda ? '<span class="dIcon" title="Apartamento con deuda">D</span>' : '';
     const shellyIcon = a.shelly ? '<span class="shellyIcon" title="Ya tiene la app Shelly">✓</span>' : '';
     const vencido = tieneDeuda && diasDesdeEnvio(a) >= recordatorioFrecuenciaDias;
@@ -1832,7 +1845,7 @@ function renderList(body, q){
       const btnCobrar = document.createElement('button');
       btnCobrar.className = 'btn primary';
       btnCobrar.style.flex = '1';
-      btnCobrar.style.background = '#ef4444';
+      btnCobrar.style.background = '#c1503f';
       btnCobrar.textContent = tieneTel ? '💰 Cobrar' : '💰 Sin teléfono';
       btnCobrar.disabled = !tieneTel;
       btnCobrar.title = projDebts.length ? 'Incluye deuda de condominio y de proyecto(s)' : '';
@@ -1956,7 +1969,7 @@ function renderFichaBody(){
     <div class="comp-list">
       ${apt.componentes.map(c=>'<div class="comp-item"><span class="t">'+c.tipo+'</span><span>'+c.label+'</span></div>').join('')}
     </div>
-    ${d ? '<h3 class="section" style="margin-top:14px;">Deuda</h3><div class="comp-item" style="color:#ef4444;border-color:#ef4444;"><span class="t">'+(d.meses!=null?d.meses+' meses':'')+'</span><span>$'+(d.monto!=null?d.monto:'-')+'</span></div>' : ''}
+    ${d ? '<h3 class="section" style="margin-top:14px;">Deuda</h3><div class="comp-item" style="color:#c1503f;border-color:#c1503f;"><span class="t">'+(d.meses!=null?d.meses+' meses':'')+'</span><span>$'+(d.monto!=null?d.monto:'-')+'</span></div>' : ''}
     <div class="savebar">
       <button class="btn ghost" id="btnFlyFicha">Ver en 3D</button>
     </div>
@@ -2212,7 +2225,7 @@ function renderProyectosTab(body){
     const recaudado = (p.aportes||[]).reduce((s,a)=>s+(a.monto_pagado||0),0);
     const pct = p.presupuesto_total ? Math.min(100, Math.round(recaudado/p.presupuesto_total*100)) : 0;
     return '<div class="card" data-id="'+esc(p.id)+'">'+
-      '<div class="idrow"><span class="idlabel">'+esc(p.nombre)+'</span><span class="badge" style="background:rgba(59,130,246,.18);color:#3b82f6;">'+pct+'%</span></div>'+
+      '<div class="idrow"><span class="idlabel">'+esc(p.nombre)+'</span><span class="badge" style="background:rgba(59,130,246,.18);color:#b8862c;">'+pct+'%</span></div>'+
       '<div class="meta">'+esc(p.descripcion||'')+'</div>'+
       '<div class="meta">Recaudado $'+recaudado.toLocaleString(undefined,{maximumFractionDigits:2})+' de $'+(p.presupuesto_total||0).toLocaleString()+'</div>'+
     '</div>';
@@ -2333,7 +2346,7 @@ function renderProyectoDetalle(body, p){
     </div>
     <div class="assumption">${esc(p.descripcion||'')}</div>
     <div class="statline"><span>Presupuesto</span><b>$${(p.presupuesto_total||0).toLocaleString()}</b></div>
-    <div class="statline"><span>Recaudado</span><b id="proyRecaudado" style="color:#10b981">$${recaudado.toLocaleString(undefined,{maximumFractionDigits:2})} (${pct}%)</b></div>
+    <div class="statline"><span>Recaudado</span><b id="proyRecaudado" style="color:#4f8f6a">$${recaudado.toLocaleString(undefined,{maximumFractionDigits:2})} (${pct}%)</b></div>
     <h3 class="section" style="margin-top:14px;">Aportes por apartamento (${(p.aportes||[]).length})</h3>
     <input type="text" id="ap_buscar_apto" class="searchbox" placeholder="Buscar apartamento o propietario...">
     <div class="savebar" style="margin:-4px 0 10px;"><button class="btn ghost" id="btnVerTodosPagos" style="flex:1;">👁️ Ver todos los pagos</button></div>
@@ -2600,12 +2613,12 @@ function renderResumenTab(body){
     <div class="statline"><span>Presupuesto anual estimado</span><b>$${RAW_DATA.presupuesto_estimado_anual.toLocaleString()}</b></div>
     <h3 class="section" style="margin-top:14px;">Apartamentos</h3>
     <div class="statline"><span>Total</span><b>${totalApts}</b></div>
-    <div class="statline"><span>Entregados</span><b style="color:#10b981">${entregados}</b></div>
-    <div class="statline"><span>Vendidos sin entregar</span><b style="color:#f59e0b">${sinEntregar}</b></div>
-    <div class="statline"><span>Vendidos sin firmar</span><b style="color:#ef4444">${sinFirmar}</b></div>
+    <div class="statline"><span>Entregados</span><b style="color:#4f8f6a">${entregados}</b></div>
+    <div class="statline"><span>Vendidos sin entregar</span><b style="color:#c9772f">${sinEntregar}</b></div>
+    <div class="statline"><span>Vendidos sin firmar</span><b style="color:#c1503f">${sinFirmar}</b></div>
     <h3 class="section" style="margin-top:14px;">Deuda</h3>
-    <div class="statline"><span>Apartamentos con deuda</span><b style="color:#ef4444">${aptsConDeuda}</b></div>
-    <div class="statline"><span>Deuda total</span><b style="color:#ef4444">$${deudaTotal.toLocaleString(undefined,{maximumFractionDigits:2})}</b></div>
+    <div class="statline"><span>Apartamentos con deuda</span><b style="color:#c1503f">${aptsConDeuda}</b></div>
+    <div class="statline"><span>Deuda total</span><b style="color:#c1503f">$${deudaTotal.toLocaleString(undefined,{maximumFractionDigits:2})}</b></div>
     <h3 class="section" style="margin-top:14px;">Alícuotas</h3>
     <div class="statline"><span>Suma alícuotas apartamentos</span><b>${(sumaAlicuota*100).toFixed(2)}%</b></div>
     <div class="statline"><span>Suma cuota anual apartamentos</span><b>$${sumaCuotaAnual.toLocaleString(undefined,{maximumFractionDigits:0})}</b></div>
@@ -2920,8 +2933,8 @@ function widgetTopDeudaCondominio(){
   const body = rows.length ? rows.map((r,i)=>{
     const pct = max>0 ? Math.round((r.monto||0)/max*100) : 0;
     return '<div class="dashRow"><span class="dashRank">'+(i+1)+'</span><span class="dashId">'+esc(r.id)+'</span>'+
-      '<span class="dashOwner">'+esc(r.propietario||'')+'</span><span class="dashVal" style="color:#ef4444;">'+fmtMoney(r.monto)+'</span></div>'+
-      '<div class="dashBarWrap"><div class="dashBar" style="width:'+pct+'%;background:#ef4444;"></div></div>';
+      '<span class="dashOwner">'+esc(r.propietario||'')+'</span><span class="dashVal" style="color:#c1503f;">'+fmtMoney(r.monto)+'</span></div>'+
+      '<div class="dashBarWrap"><div class="dashBar" style="width:'+pct+'%;background:#c1503f;"></div></div>';
   }).join('') : '<div class="dashEmpty">Sin datos de deuda cargados.</div>';
   return '<div class="dashWidget"><h3>Top 10 · Deuda condominio ($)</h3>'+body+'</div>';
 }
@@ -2932,18 +2945,18 @@ function widgetTopRecibosVencidos(){
   const body = rows.length ? rows.map((r,i)=>{
     const pct = max>0 ? Math.round((r.meses||0)/max*100) : 0;
     return '<div class="dashRow"><span class="dashRank">'+(i+1)+'</span><span class="dashId">'+esc(r.id)+'</span>'+
-      '<span class="dashOwner">'+esc(r.propietario||'')+'</span><span class="dashVal" style="color:#f59e0b;">'+(r.meses!=null?r.meses:'-')+' recibo(s)</span></div>'+
-      '<div class="dashBarWrap"><div class="dashBar" style="width:'+pct+'%;background:#f59e0b;"></div></div>';
+      '<span class="dashOwner">'+esc(r.propietario||'')+'</span><span class="dashVal" style="color:#c9772f;">'+(r.meses!=null?r.meses:'-')+' recibo(s)</span></div>'+
+      '<div class="dashBarWrap"><div class="dashBar" style="width:'+pct+'%;background:#c9772f;"></div></div>';
   }).join('') : '<div class="dashEmpty">Sin datos de deuda cargados.</div>';
   return '<div class="dashWidget"><h3>Top 10 · Recibos vencidos (condominio)</h3>'+body+'</div>';
 }
 
 function widgetEnvejecimiento(){
   const buckets = [
-    {label:'1-3 meses', min:1, max:3, count:0, monto:0, color:'#f59e0b', items:[]},
-    {label:'4-6 meses', min:4, max:6, count:0, monto:0, color:'#fb923c', items:[]},
-    {label:'7-12 meses', min:7, max:12, count:0, monto:0, color:'#ef4444', items:[]},
-    {label:'+12 meses', min:13, max:Infinity, count:0, monto:0, color:'#b91c1c', items:[]}
+    {label:'1-3 meses', min:1, max:3, count:0, monto:0, color:'#c9772f', items:[]},
+    {label:'4-6 meses', min:4, max:6, count:0, monto:0, color:'#b8632f', items:[]},
+    {label:'7-12 meses', min:7, max:12, count:0, monto:0, color:'#c1503f', items:[]},
+    {label:'+12 meses', min:13, max:Infinity, count:0, monto:0, color:'#96392c', items:[]}
   ];
   deudaRows.forEach(r=>{
     const m = r.meses||0;
@@ -3009,7 +3022,7 @@ function widgetPareto80(){
   const pct = totalDebt>0 ? Math.round(acc/totalDebt*100) : 0;
   const body = pareto.length ? pareto.map((r,i)=>
     '<div class="dashRow"><span class="dashRank">'+(i+1)+'</span><span class="dashId">'+esc(r.id)+'</span>'+
-    '<span class="dashOwner">'+esc(r.propietario||'')+'</span><span class="dashVal" style="color:#ef4444;">'+fmtMoney(r.monto)+'</span></div>'
+    '<span class="dashOwner">'+esc(r.propietario||'')+'</span><span class="dashVal" style="color:#c1503f;">'+fmtMoney(r.monto)+'</span></div>'
   ).join('') : '<div class="dashEmpty">Sin datos de deuda cargados.</div>';
   const nota = pareto.length ? '<div class="assumption" style="margin-top:8px;">Estos '+pareto.length+' apartamento(s) concentran $'+acc.toLocaleString(undefined,{maximumFractionDigits:2})+' ('+pct+'% de la deuda total del condominio). Priorizar cobranza aquí.</div>' : '';
   return '<div class="dashWidget" style="grid-column:1/-1;"><h3>Concentración de deuda (Pareto 80%)</h3>'+body+nota+'</div>';
@@ -3047,13 +3060,13 @@ function widgetHistoricoDeudaTotal(){
   const showLabel = new Set([0, pts.length-1]);
   if(pts.length>2) showLabel.add(Math.floor((pts.length-1)/2));
   const dateLabels = pts.map((p,i)=> showLabel.has(i) ? '<text x="'+p.x.toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" font-size="9" fill="var(--sub)">'+fechaCorta(p.s.fecha)+'</text>' : '').join('');
-  const dots = pts.map(p=>'<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="3.5" fill="#ef4444"><title>'+fechaCorta(p.s.fecha)+': '+fmtMoney(p.s.total)+' ('+p.s.apartamentos.length+' apto(s))</title></circle>').join('');
+  const dots = pts.map(p=>'<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="3.5" fill="#c1503f"><title>'+fechaCorta(p.s.fecha)+': '+fmtMoney(p.s.total)+' ('+p.s.apartamentos.length+' apto(s))</title></circle>').join('');
   const last = pts[pts.length-1];
-  const lastLabel = '<text x="'+last.x.toFixed(1)+'" y="'+(last.y-9).toFixed(1)+'" text-anchor="end" font-size="11" font-weight="700" fill="#ef4444">'+fmtMoney(vals[vals.length-1])+'</text>';
+  const lastLabel = '<text x="'+last.x.toFixed(1)+'" y="'+(last.y-9).toFixed(1)+'" text-anchor="end" font-size="11" font-weight="700" fill="#c1503f">'+fmtMoney(vals[vals.length-1])+'</text>';
   const svg = '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:'+H+'px;overflow:visible;display:block;">'
     +gridLines
-    +'<path d="'+areaPath+'" fill="#ef4444" fill-opacity="0.12" stroke="none"/>'
-    +'<path d="'+linePath+'" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+    +'<path d="'+areaPath+'" fill="#c1503f" fill-opacity="0.12" stroke="none"/>'
+    +'<path d="'+linePath+'" fill="none" stroke="#c1503f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
     +dots+dateLabels+lastLabel
     +'</svg>';
   return '<div class="dashWidget"><h3>Histórico de deuda total ('+snaps.length+' actualizaciones)</h3>'+svg+'</div>';
@@ -3092,10 +3105,10 @@ function widgetMovimientosDeuda(){
     return '<div class="dashRow"><span class="dashId">'+esc(m.id)+'</span><span class="dashOwner">'+esc(m.nombre)+'</span><span class="dashVal" style="color:'+color+';">'+txt+'</span></div>';
   };
   const section = (title, items, renderFn)=> items.length ? ('<div style="font-size:11px;font-weight:700;color:var(--text);margin:10px 0 2px;">'+title+' ('+items.length+')</div>'+items.map(renderFn).join('')) : '';
-  const body = section('🆕 Nuevos en deuda', nuevos, m=>rowSimple(m,'#ef4444','Nuevo'))
-    + section('🔺 Aumentó', subieron, m=>rowChange(m,'#f59e0b'))
-    + section('🔻 Disminuyó', bajaron, m=>rowChange(m,'#10b981'))
-    + section('✅ Salió de deuda', salieron, m=>rowSimple(m,'#10b981','Pagó'));
+  const body = section('🆕 Nuevos en deuda', nuevos, m=>rowSimple(m,'#c1503f','Nuevo'))
+    + section('🔺 Aumentó', subieron, m=>rowChange(m,'#c9772f'))
+    + section('🔻 Disminuyó', bajaron, m=>rowChange(m,'#4f8f6a'))
+    + section('✅ Salió de deuda', salieron, m=>rowSimple(m,'#4f8f6a','Pagó'));
   const fecha = new Date(curr.fecha).toLocaleDateString('es-VE',{day:'2-digit',month:'short',year:'numeric'});
   return '<div class="dashWidget" style="grid-column:1/-1;"><h3>Movimientos de deuda · actualización del '+fecha+'</h3>'+(body || '<div class="dashEmpty">No hubo cambios respecto a la actualización anterior.</div>')+'</div>';
 }
@@ -3107,7 +3120,7 @@ function widgetTodosDeudoresCondominio(){
   const body = rows.length ? rows.map((r,i)=>
     '<div class="dashRow"><span class="dashRank">'+(i+1)+'</span><span class="dashId">'+esc(r.id)+'</span>'
     +'<span class="dashOwner">'+esc(r.propietario||'')+'</span>'
-    +'<span class="dashVal" style="color:#ef4444;">'+fmtMoney(r.monto)+(r.meses!=null?' · '+r.meses+' recibo(s)':'')+'</span></div>'
+    +'<span class="dashVal" style="color:#c1503f;">'+fmtMoney(r.monto)+(r.meses!=null?' · '+r.meses+' recibo(s)':'')+'</span></div>'
   ).join('') : '<div class="dashEmpty">Sin datos de deuda cargados.</div>';
   return '<div class="dashWidget" style="grid-column:1/-1;"><h3>Todos los deudores del condominio ('+rows.length+') · Total '+fmtMoney(total)+'</h3>'+body+'</div>';
 }
@@ -3124,12 +3137,27 @@ function widgetTodosDeudoresProyecto(){
   const body = rows.length ? rows.map((r,i)=>
     '<div class="dashRow"><span class="dashRank">'+(i+1)+'</span><span class="dashId">'+esc(r.id)+'</span>'
     +'<span class="dashOwner">'+esc(r.propietario||'')+'</span>'
-    +'<span class="dashVal" style="color:#ef4444;">'+fmtMoney(r.pendiente)+'</span></div>'
+    +'<span class="dashVal" style="color:#c1503f;">'+fmtMoney(r.pendiente)+'</span></div>'
   ).join('') : '<div class="dashEmpty">No hay apartamentos pendientes en este proyecto.</div>';
   return '<div class="dashWidget" style="grid-column:1/-1;"><h3>Todos los deudores de "'+esc(p.nombre)+'" ('+rows.length+') · Pendiente total '+fmtMoney(total)+'</h3>'+body+'</div>';
 }
 
 let currentDashHoja = '1';
+// fila de tarjetas resumen (KPIs) al tope del dashboard: vista rapida antes de entrar al detalle
+function widgetResumenTiles(){
+  const totalApts = apartments.length;
+  const conDeuda = deudaRows.length;
+  const alDia = Math.max(0, totalApts - conDeuda);
+  const pctAlDia = totalApts ? Math.round((alDia/totalApts)*100) : 0;
+  const totalPendiente = deudaRows.reduce((s,r)=>s+(r.monto||0),0);
+  const pendienteProyectos = proyectos.reduce((s,p)=>s+(p.aportes||[]).reduce((s2,a)=>s2+Math.max(0,(a.monto_aporte||0)-(a.monto_pagado||0)),0),0);
+  return '<div class="statTiles" style="grid-column:1/-1;">'
+    +'<div class="statTile ok"><div class="stLabel">Al día</div><div class="stValue">'+pctAlDia+'%</div><div class="stSub">'+alDia+' de '+totalApts+' apartamentos</div></div>'
+    +'<div class="statTile danger"><div class="stLabel">Con deuda</div><div class="stValue">'+conDeuda+'</div><div class="stSub">'+fmtMoney(totalPendiente)+' pendiente</div></div>'
+    +'<div class="statTile accent"><div class="stLabel">Proyectos especiales</div><div class="stValue">'+fmtMoney(pendienteProyectos)+'</div><div class="stSub">pendiente por cobrar</div></div>'
+    +'<div class="statTile"><div class="stLabel">Total apartamentos</div><div class="stValue">'+totalApts+'</div><div class="stSub">Torre A y B</div></div>'
+    +'</div>';
+}
 function renderDashboard(){
   const body = document.getElementById('dashboardBody');
   if(currentDashHoja==='2'){
@@ -3137,7 +3165,7 @@ function renderDashboard(){
   } else if(currentDashHoja==='3'){
     body.innerHTML = widgetTodosDeudoresProyecto();
   } else {
-    body.innerHTML = widgetRecordatoriosPendientes() + widgetTopDeudaCondominio() + widgetTopRecibosVencidos() + widgetEnvejecimiento() + widgetSinTelefono() + widgetPareto80() + widgetHistoricoDeudaTotal() + widgetMovimientosDeuda();
+    body.innerHTML = widgetResumenTiles() + widgetRecordatoriosPendientes() + widgetTopDeudaCondominio() + widgetTopRecibosVencidos() + widgetEnvejecimiento() + widgetSinTelefono() + widgetPareto80() + widgetHistoricoDeudaTotal() + widgetMovimientosDeuda();
   }
 }
 document.getElementById('dashHojasBar').addEventListener('click', (e)=>{
@@ -3350,10 +3378,10 @@ function buildDashboardImageData(){
   const topDeuda = deudaRows.slice().sort((a,b)=>(b.monto||0)-(a.monto||0)).slice(0,10).map(r=>({id:r.id, val:r.monto||0}));
   const topRecibos = deudaRows.slice().sort((a,b)=>(b.meses||0)-(a.meses||0)).slice(0,10).map(r=>({id:r.id, val:r.meses||0}));
   const buckets = [
-    {label:'1-3 meses', min:1, max:3, count:0, monto:0, color:'#f59e0b'},
-    {label:'4-6 meses', min:4, max:6, count:0, monto:0, color:'#fb923c'},
-    {label:'7-12 meses', min:7, max:12, count:0, monto:0, color:'#ef4444'},
-    {label:'+12 meses', min:13, max:Infinity, count:0, monto:0, color:'#b91c1c'}
+    {label:'1-3 meses', min:1, max:3, count:0, monto:0, color:'#c9772f'},
+    {label:'4-6 meses', min:4, max:6, count:0, monto:0, color:'#b8632f'},
+    {label:'7-12 meses', min:7, max:12, count:0, monto:0, color:'#c1503f'},
+    {label:'+12 meses', min:13, max:Infinity, count:0, monto:0, color:'#96392c'}
   ];
   deudaRows.forEach(r=>{
     const m = r.meses||0;
@@ -3391,23 +3419,23 @@ function exportDeudoresImage(tipo){
   ctx.fillStyle = '#161f2b'; ctx.fillRect(0,0,W,70);
   ctx.fillStyle = '#e7edf5'; ctx.font = 'bold 17px -apple-system,Segoe UI,Roboto,sans-serif';
   ctx.fillText(title, PAD, 32);
-  ctx.fillStyle = '#94a3b8'; ctx.font = '12px -apple-system,Segoe UI,Roboto,sans-serif';
+  ctx.fillStyle = '#8c8579'; ctx.font = '12px -apple-system,Segoe UI,Roboto,sans-serif';
   ctx.fillText('Generado el '+new Date().toLocaleDateString('es-VE',{year:'numeric',month:'long',day:'numeric'})+' · Solo números de apartamento, sin nombres.', PAD, 52);
   let y = 100;
   if(!rows.length){
-    ctx.fillStyle='#94a3b8'; ctx.font='13px sans-serif'; ctx.fillText('No hay deudores en este momento.', PAD, y);
+    ctx.fillStyle='#8c8579'; ctx.font='13px sans-serif'; ctx.fillText('No hay deudores en este momento.', PAD, y);
   } else {
     rows.forEach(r=>{
       ctx.fillStyle = '#e7edf5'; ctx.font = 'bold 13px -apple-system,Segoe UI,Roboto,sans-serif';
       ctx.fillText(r.id, PAD, y);
       ctx.textAlign = 'right';
-      ctx.fillStyle = '#ef4444';
+      ctx.fillStyle = '#c1503f';
       ctx.fillText(fmtMoney(r.val)+(r.suffix?' · '+r.suffix:''), W-PAD, y);
       ctx.textAlign = 'left';
       y += rowH;
     });
   }
-  ctx.fillStyle = '#64748b'; ctx.font = '11px -apple-system,Segoe UI,Roboto,sans-serif';
+  ctx.fillStyle = '#9a958a'; ctx.font = '11px -apple-system,Segoe UI,Roboto,sans-serif';
   ctx.fillText('Junta de Condominio · Hatillo Hill', PAD, H-16);
   canvas.toBlob(function(blob){
     const url = URL.createObjectURL(blob);
@@ -3459,7 +3487,7 @@ function exportDashboardImage(){
   ctx.fillStyle = '#161f2b'; ctx.fillRect(0,0,W,90);
   ctx.fillStyle = '#e7edf5'; ctx.font = 'bold 22px -apple-system,Segoe UI,Roboto,sans-serif';
   ctx.fillText('HATILLO HILL · Resumen de deuda', PAD, 42);
-  ctx.fillStyle = '#94a3b8'; ctx.font = '13px -apple-system,Segoe UI,Roboto,sans-serif';
+  ctx.fillStyle = '#8c8579'; ctx.font = '13px -apple-system,Segoe UI,Roboto,sans-serif';
   ctx.fillText('Generado el '+new Date().toLocaleDateString('es-VE',{year:'numeric',month:'long',day:'numeric'})+' · Solo se muestran números de apartamento, sin nombres de propietarios.', PAD, 66);
   y = 110;
 
@@ -3483,12 +3511,12 @@ function exportDashboardImage(){
   }
 
   sectionTitle('Top '+data.topDeuda.length+' · Deuda condominio ($)');
-  if(data.topDeuda.length===0){ ctx.fillStyle='#94a3b8'; ctx.font='13px sans-serif'; ctx.fillText('Sin datos de deuda.', PAD, y); y+=20; }
-  data.topDeuda.forEach(r=> barRow(r.id, r.val, barMax, '#ef4444'));
+  if(data.topDeuda.length===0){ ctx.fillStyle='#8c8579'; ctx.font='13px sans-serif'; ctx.fillText('Sin datos de deuda.', PAD, y); y+=20; }
+  data.topDeuda.forEach(r=> barRow(r.id, r.val, barMax, '#c1503f'));
   y += 16;
 
   sectionTitle('Top '+data.topRecibos.length+' · Recibos vencidos');
-  data.topRecibos.forEach(r=> barRow(r.id, r.val, recMax, '#f59e0b', 'recibo(s)'));
+  data.topRecibos.forEach(r=> barRow(r.id, r.val, recMax, '#c9772f', 'recibo(s)'));
   y += 16;
 
   sectionTitle('Envejecimiento de deuda');
@@ -3506,19 +3534,19 @@ function exportDashboardImage(){
   y += 16;
 
   sectionTitle('Sin teléfono registrado ('+data.sinTelIds.length+')');
-  ctx.fillStyle = '#94a3b8'; ctx.font = '13px -apple-system,Segoe UI,Roboto,sans-serif';
+  ctx.fillStyle = '#8c8579'; ctx.font = '13px -apple-system,Segoe UI,Roboto,sans-serif';
   wrapTextLines(ctx, sinTelText, W-PAD*2).forEach(line=>{ ctx.fillText(line, PAD, y); y += 18; });
   y += 16;
 
   sectionTitle('Concentración de deuda (Pareto 80%)');
-  data.paretoRows.forEach(r=> barRow(r.id, r.val, Math.max(1,...data.paretoRows.map(x=>x.val)), '#ef4444'));
+  data.paretoRows.forEach(r=> barRow(r.id, r.val, Math.max(1,...data.paretoRows.map(x=>x.val)), '#c1503f'));
   if(paretoNote){
-    ctx.fillStyle = '#94a3b8'; ctx.font = '12px -apple-system,Segoe UI,Roboto,sans-serif';
+    ctx.fillStyle = '#8c8579'; ctx.font = '12px -apple-system,Segoe UI,Roboto,sans-serif';
     wrapTextLines(ctx, paretoNote, W-PAD*2).forEach(line=>{ ctx.fillText(line, PAD, y); y += 16; });
   }
   y += 8;
 
-  ctx.fillStyle = '#64748b'; ctx.font = '11px -apple-system,Segoe UI,Roboto,sans-serif';
+  ctx.fillStyle = '#9a958a'; ctx.font = '11px -apple-system,Segoe UI,Roboto,sans-serif';
   ctx.fillText('Junta de Condominio · Hatillo Hill', PAD, H-20);
 
   canvas.toBlob(function(blob){
