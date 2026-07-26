@@ -172,6 +172,17 @@
   .statTile.danger .stValue{color:var(--red);}
   .statTile.accent .stValue{color:var(--accent);}
   @media (max-width:760px){ .statTiles{grid-template-columns:1fr 1fr;} }
+  /* dashboard combinado: numero protagonista arriba, grilla en medio, lista de acciones abajo */
+  .dashHero{padding-bottom:14px;margin-bottom:2px;border-bottom:1px solid var(--border);}
+  .dashHeroLabel{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--sub);font-weight:700;margin-bottom:4px;}
+  .dashHeroValue{font-size:38px;font-weight:800;color:var(--red);line-height:1;font-variant-numeric:tabular-nums;}
+  .accionRow{display:flex;align-items:center;gap:12px;padding:9px 10px;background:var(--panel);border-radius:10px;border-left:3px solid var(--accent);}
+  .accionAvatar{width:30px;height:30px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;flex:none;color:var(--text);}
+  .accionInfo{flex:1;min-width:0;}
+  .accionTitle{font-size:12.5px;font-weight:700;color:var(--text);}
+  .accionSub{font-size:11px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .accionBtn{background:transparent;border:none;font-size:16px;cursor:pointer;flex:none;padding:4px;}
+  .accionBtn:disabled{opacity:.35;cursor:not-allowed;}
   .dashRow{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;padding:5px 0;border-bottom:1px dashed var(--border);gap:8px;}
   .dashRow:last-child{border-bottom:none;}
   .dashRank{color:var(--sub);font-weight:700;width:18px;flex:0 0 18px;}
@@ -3112,7 +3123,46 @@ function widgetEnvejecimiento(){
 
 // apartamentos con deuda (condominio o proyecto especial) a los que toca escribirles hoy,
 // según recordatorioFrecuenciaDias; "nunca se le ha escrito" cuenta como vencido de inmediato
-function widgetRecordatoriosPendientes(){
+// numero protagonista del dashboard: deuda total + tendencia contra la actualizacion anterior
+// (usa el mismo deudaHistorial que ya alimenta el grafico de abajo, solo que en miniatura)
+function widgetHero(){
+  const totalPendiente = deudaRows.reduce((s,r)=>s+(r.monto||0),0);
+  const snaps = deudaHistorial.slice(-12);
+  let trendHtml = '', sparkSvg = '';
+  if(snaps.length>=2){
+    const prev = snaps[snaps.length-2].total, last = snaps[snaps.length-1].total;
+    const delta = prev>0 ? Math.round(((last-prev)/prev)*100) : 0;
+    const arrow = delta>0?'↑':delta<0?'↓':'→';
+    const color = delta>0?'#c1503f':delta<0?'#4f8f6a':'#8c8579';
+    trendHtml = '<div style="font-size:12px;color:'+color+';font-weight:600;">'+arrow+' '+Math.abs(delta)+'% vs. actualización anterior</div>';
+    const vals = snaps.map(s=>s.total);
+    const maxV = Math.max(...vals,1), minV = Math.min(0,Math.min(...vals)), range=(maxV-minV)||1;
+    const W=140,H=44;
+    const pts = snaps.map((s,i)=>{
+      const x = snaps.length===1?W/2:(i/(snaps.length-1))*W;
+      const y = H-((s.total-minV)/range)*H;
+      return [x,y];
+    });
+    const ptsStr = pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+    const lastPt = pts[pts.length-1];
+    sparkSvg = '<svg viewBox="0 0 '+W+' '+H+'" style="width:130px;height:44px;flex:none;"><polyline points="'+ptsStr+'" fill="none" stroke="'+color+'" stroke-width="2.2"/><circle cx="'+lastPt[0].toFixed(1)+'" cy="'+lastPt[1].toFixed(1)+'" r="3.5" fill="'+color+'"/></svg>';
+  }
+  return '<div class="dashHero" style="grid-column:1/-1;">'
+    +'<div class="dashHeroLabel">Deuda total del condominio hoy</div>'
+    +'<div style="display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;">'
+    +'<div class="dashHeroValue">'+fmtMoney(totalPendiente)+'</div>'
+    +sparkSvg
+    +'<div style="padding-bottom:8px;">'+trendHtml+'</div>'
+    +'</div></div>';
+}
+function initialsFrom(name){
+  if(!name) return '—';
+  const parts = String(name).trim().split(/\s+/);
+  return (((parts[0]||'')[0]||'')+((parts[1]||'')[0]||'')).toUpperCase();
+}
+// lista accionable "a quien escribirle hoy" (reemplaza al widget de recordatorios de siempre,
+// misma logica de seleccion, pero mostrando solo los primeros y con estilo de tarjeta+iniciales)
+function widgetAccionHoy(){
   const pendientes = apartments.filter(a=>{
     const d = findDeuda(a);
     const projDebts = proyectoDeudas(a.id);
@@ -3120,15 +3170,26 @@ function widgetRecordatoriosPendientes(){
     if(!tieneDeuda) return false;
     return diasDesdeEnvio(a) >= recordatorioFrecuenciaDias;
   }).sort((a,b)=> diasDesdeEnvio(b) - diasDesdeEnvio(a));
-  const body = pendientes.length ? pendientes.map(a=>{
+  if(!pendientes.length){
+    return '<div class="dashWidget" style="grid-column:1/-1;"><h3>Hoy no hay nadie a quien escribirle</h3><div class="dashEmpty">Todos los recordatorios están al día.</div></div>';
+  }
+  const rowHtml = (a, idx)=>{
     const dias = diasDesdeEnvio(a);
     const diasTxt = dias===Infinity ? 'nunca se le ha escrito' : 'hace '+Math.floor(dias)+' día(s)';
     const tieneTel = getContactOptions(a).length>0;
-    return '<div class="dashRow"><span class="dashId">'+esc(a.id)+'</span>'
-      +'<span class="dashOwner">'+esc(a.propietario||'')+' · '+diasTxt+'</span>'
-      +'<button class="btn ghost" data-recordatorio-id="'+esc(a.id)+'" style="padding:3px 8px;font-size:11px;flex:0 0 auto;" '+(tieneTel?'':'disabled title="Sin teléfono registrado"')+'>💬 Recordar</button></div>';
-  }).join('') : '<div class="dashEmpty">No hay recordatorios pendientes hoy.</div>';
-  return '<div class="dashWidget" style="grid-column:1/-1;"><h3>Recordatorios de cobro pendientes ('+pendientes.length+')</h3>'+body+'</div>';
+    const borderColor = idx===0?'var(--red)':idx===1?'var(--amber)':'var(--accent)';
+    return '<div class="accionRow" style="border-left-color:'+borderColor+';">'
+      +'<div class="accionAvatar">'+esc(initialsFrom(a.propietario))+'</div>'
+      +'<div class="accionInfo"><div class="accionTitle">'+esc(a.id)+' · '+diasTxt+'</div><div class="accionSub">'+esc(a.propietario||'Sin propietario')+'</div></div>'
+      +'<button class="accionBtn" data-recordatorio-id="'+esc(a.id)+'" '+(tieneTel?'':'disabled title="Sin teléfono registrado"')+'>💬</button>'
+      +'</div>';
+  };
+  const top = pendientes.slice(0,5);
+  const body = top.map(rowHtml).join('');
+  const resto = pendientes.length>top.length
+    ? '<details style="margin-top:8px;"><summary style="cursor:pointer;font-size:12px;color:var(--sub);">Ver los otros '+(pendientes.length-top.length)+'</summary><div style="margin-top:8px;display:flex;flex-direction:column;gap:8px;">'+pendientes.slice(top.length).map(rowHtml).join('')+'</div></details>'
+    : '';
+  return '<div class="dashWidget" style="grid-column:1/-1;"><h3>Hoy deberías escribirle a '+pendientes.length+' persona(s)</h3><div style="display:flex;flex-direction:column;gap:8px;">'+body+'</div>'+resto+'</div>';
 }
 
 function widgetSinTelefono(){
@@ -3294,7 +3355,7 @@ function renderDashboard(){
   } else if(currentDashHoja==='3'){
     body.innerHTML = widgetTodosDeudoresProyecto();
   } else {
-    body.innerHTML = widgetResumenTiles() + widgetRecordatoriosPendientes() + widgetTopDeudaCondominio() + widgetTopRecibosVencidos() + widgetEnvejecimiento() + widgetSinTelefono() + widgetPareto80() + widgetHistoricoDeudaTotal() + widgetMovimientosDeuda();
+    body.innerHTML = widgetHero() + widgetResumenTiles() + widgetAccionHoy() + widgetTopDeudaCondominio() + widgetTopRecibosVencidos() + widgetEnvejecimiento() + widgetSinTelefono() + widgetPareto80() + widgetHistoricoDeudaTotal() + widgetMovimientosDeuda();
   }
 }
 document.getElementById('dashHojasBar').addEventListener('click', (e)=>{
