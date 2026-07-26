@@ -315,7 +315,7 @@ let pendingPagoAptId = null; // apto a preseleccionar en "Registrar abono" al ll
 
 const PISOS = ['PB','1','2','3','PH'];
 const SOTANOS = ['1','2','3'];
-const HILITE_COLOR = 0xff0000; // rojo intenso
+const HILITE_COLOR = 0x0a84ff; // azul de seleccion (estilo macOS); el rojo queda solo para deuda
 
 function extractDigits(str){
   const m = String(str).match(/\d+/g);
@@ -851,12 +851,13 @@ function buildCobroMessage(a, d, projDebts){
 
 // ---------- estado -> color ----------
 function pisoColor(piso){
-  if(piso==='PB') return 0x3b82f6; // azul
-  if(piso==='1') return 0x10b981; // verde
-  if(piso==='2') return 0xe5e7eb; // blanco
-  if(piso==='3') return 0xf97316; // naranja
-  if(piso==='PH') return 0x9ca3af; // gris
-  return 0x64748b;
+  // paleta minimalista y desaturada (misma familia de tonos que antes, mas suave)
+  if(piso==='PB') return 0x9fb8c4; // azul apagado
+  if(piso==='1') return 0x9fc2a8; // verde apagado
+  if(piso==='2') return 0xe8e3d5; // crema
+  if(piso==='3') return 0xc9a668; // ocre/naranja apagado
+  if(piso==='PH') return 0xb0a99c; // gris calido
+  return 0x9a958a;
 }
 function estadoColor(estado){
   if(!estado) return 0x10b981; // entregado
@@ -888,15 +889,15 @@ function makeSkyTexture(){
   const c = document.createElement('canvas'); c.width=2; c.height=256;
   const ctx = c.getContext('2d');
   const g = ctx.createLinearGradient(0,0,0,256);
-  g.addColorStop(0, '#1b2a4a');
-  g.addColorStop(0.45, '#2f4d78');
-  g.addColorStop(0.75, '#7d8fae');
-  g.addColorStop(1, '#c9b79c');
+  g.addColorStop(0, '#eae2d2');
+  g.addColorStop(0.45, '#f0e9db');
+  g.addColorStop(0.75, '#f6f1e6');
+  g.addColorStop(1, '#faf7f0');
   ctx.fillStyle = g; ctx.fillRect(0,0,2,256);
   return new THREE.CanvasTexture(c);
 }
 scene.background = makeSkyTexture();
-scene.fog = new THREE.Fog(0x54637f, 45, 120);
+scene.fog = new THREE.Fog(0xe4dccb, 45, 120);
 
 const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 500);
 let camTarget = new THREE.Vector3(0,6,0);
@@ -1348,7 +1349,7 @@ function buildScene(){
         const h = kind==='park' ? 0.35 : 0.9;
         const geo = new THREE.BoxGeometry(cw*0.85, h, cd*0.85);
         const mat = new THREE.MeshStandardMaterial({
-          color: isSel ? HILITE_COLOR : (kind==='park' ? 0x64748b : 0xa16207),
+          color: isSel ? HILITE_COLOR : (kind==='park' ? 0x9a958a : 0x8a5a2b),
           roughness:0.6,
           emissive: isSel ? HILITE_COLOR : 0x000000,
           emissiveIntensity: isSel ? 1.1 : 0
