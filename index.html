@@ -4,6 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Hatillo Hill 3D</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
@@ -365,7 +366,7 @@ let pendingPagoAptId = null; // apto a preseleccionar en "Registrar abono" al ll
 
 const PISOS = ['PB','1','2','3','PH'];
 const SOTANOS = ['1','2','3'];
-const HILITE_COLOR = 0x0a84ff; // azul de seleccion (estilo macOS); el rojo queda solo para deuda
+const HILITE_COLOR = 0xffcc33; // amarillo calido de seleccion (como si se prendiera la luz del apartamento); el rojo queda solo para deuda
 
 function extractDigits(str){
   const m = String(str).match(/\d+/g);
@@ -1091,23 +1092,41 @@ function makeCaladoTexture(){
 }
 const CALADO_TEX = makeCaladoTexture();
 
-// ground (colocado bajo el ultimo sotano para que los sotanos se vean igual que los pisos)
-const groundGeo = new THREE.PlaneGeometry(160,160);
-const groundMat = new THREE.MeshStandardMaterial({map:makeGroundTexture(), color:0x8fa5c4, roughness:1});
-const ground = new THREE.Mesh(groundGeo, groundMat);
-ground.rotation.x = -Math.PI/2;
-ground.position.y = GROUND_Y;
-ground.receiveShadow = true;
-scene.add(ground);
-
-const gridHelper = new THREE.GridHelper(160,80,0x223044,0x1a2432);
-gridHelper.position.y = GROUND_Y+0.01;
-scene.add(gridHelper);
+// el plano de piso y la cuadricula de referencia ya no se dibujan: el modelo 3D
+// realista trae su propio terreno/jardin, y ahora solo queda la imagen del edificio.
 const CELL_W = 2.1, CELL_D = 1.6, GAP=0.35;
 
 const objectsGroup = new THREE.Group();
 scene.add(objectsGroup);
 const raycastTargets = [];
+
+// modelo 3D realista de la fachada real (residencias-hatillo-hill.glb), como fondo visual.
+// no participa en el raycasting de clics: las cajas holograma (invisibles/translucidas) siguen
+// siendo el objetivo de clic para cada apartamento, exactamente igual que antes.
+// el eje Z del modelo ya coincide con la convencion de la app (Torre A = Z+, Torre B = Z-),
+// y el modelo ya viene centrado en X=0/Z=0 con el nivel de suelo en Y=0, asi que solo hace falta escala.
+(function loadRealisticBuilding(){
+  const GLB_SCALE = 0.6; // ajustado visualmente para que la altura coincida con los pisos PB-PH
+  const loader = new THREE.GLTFLoader();
+  loader.load('./residencias-hatillo-hill.glb', (gltf)=>{
+    const model = gltf.scene;
+    model.scale.setScalar(GLB_SCALE);
+    model.position.set(0,0,0);
+    model.traverse(o=>{ if(o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+    scene.add(model);
+  }, undefined, (err)=>{
+    console.warn('No se pudo cargar el modelo 3D realista (residencias-hatillo-hill.glb):', err);
+  });
+})();
+
+// anclajes reales por apartamento (ventana/balcon exacto), ubicados a mano con la herramienta
+// anclaje_apartamentos.html. Si un apartamento no tiene anclaje (ej. uno nuevo), placeApt()
+// cae de vuelta a la cuadricula abstracta de siempre.
+let anchorPositions = {};
+fetch('./hatillo_hill_anchors.json').then(r=>r.json()).then(data=>{
+  anchorPositions = data || {};
+  if(typeof rebuildScene==='function') rebuildScene();
+}).catch(err=> console.warn('No se pudieron cargar los anclajes de apartamentos (hatillo_hill_anchors.json):', err));
 
 // palmeras y arbustos tropicales alrededor del edificio, como en las fotos reales (se crean una sola vez)
 function makePalmTree(scale){
@@ -1160,7 +1179,7 @@ function addLandscaping(){
     scene.add(bush);
   });
 }
-addLandscaping();
+// addLandscaping(); // desactivado: el modelo 3D realista ya incluye jardineria/paisajismo propio
 
 function apartmentsByTowerFloor(torre,piso){
   return apartments.filter(a=>a.torre===torre && a.piso===piso)
@@ -1244,20 +1263,6 @@ function buildScene(){
       const zFar = totalD; // extremo lejano al nucleo
       if(zFar > maxFarZ) maxFarZ = zFar;
 
-      // floor slab (se extiende desde el nucleo z=0 hacia zSign*zFar)
-      const slabGeo = new THREE.BoxGeometry(totalW+1.4, 0.18, totalD+1.0);
-      const slabMat = new THREE.MeshStandardMaterial({color:0x1c2735, roughness:0.9, transparent:true, opacity:0.85});
-      const slab = new THREE.Mesh(slabGeo, slabMat);
-      slab.position.set(0, y-0.15, zSign*(totalD/2));
-      slab.receiveShadow = true;
-      objectsGroup.add(slab);
-
-      // floor label
-      const fLabel = makeTextSprite('Piso '+piso+' - Torre '+torre, {fontSize:26, color: torre==='A' ? '#60a5fa' : '#c084fc'});
-      fLabel.position.set(-totalW/2-1.8, y+0.6, zSign*(totalD/2));
-      objectsGroup.add(fLabel);
-      floorLabelSprites.push({sprite:fLabel, piso});
-
       function placeApt(numero, colX, rowIdx){
         const apt = list.find(a=>{
           const nn = parseInt((a.id.split('-').pop()||'0').replace(/\D/g,'')) || 0;
@@ -1265,16 +1270,20 @@ function buildScene(){
         });
         if(!apt) return;
         const isSel = selected && selected.type==='apt' && selected.ref.id===apt.id;
-        const hidden = (filterPiso!=='ALL' && filterPiso!==piso) || (filterTorre!=='ALL' && filterTorre!==torre) || (filterSotano!==null) || (filterDeuda==='con' && !findDeuda(apt)) || (filterDeuda==='sin' && !!findDeuda(apt));
+        const hidden = (filterPiso!=='ALL' && filterPiso!==piso) || (filterTorre!=='ALL' && filterTorre!==torre) || (filterDeuda==='con' && !findDeuda(apt)) || (filterDeuda==='sin' && !!findDeuda(apt));
         if(hidden && !isSel) return; // desaparece por completo si no coincide con el filtro
+        const anchor = anchorPositions[apt.id];
         const pz = zSign*((rowIdx+0.5)*(CELL_D+GAP));
-        const h = FLOOR_H*0.72;
-        const geo = new THREE.BoxGeometry(CELL_W*0.92, h, CELL_D*0.92);
+        const h = anchor ? 1.05 : FLOOR_H*0.72;
+        const w = anchor ? 1.05 : CELL_W*0.92;
+        const d = anchor ? 0.5 : CELL_D*0.92;
+        const geo = new THREE.BoxGeometry(w, h, d);
         const mat = isSel
-          ? new THREE.MeshStandardMaterial({ color: HILITE_COLOR, roughness:0.4, metalness:0.05, emissive: HILITE_COLOR, emissiveIntensity: 1.1 })
-          : new THREE.MeshStandardMaterial({ color: 0x0e1f38, roughness:0.35, metalness:0.15, emissive: 0x0a1830, emissiveIntensity: 0.35 });
+          ? new THREE.MeshStandardMaterial({ color: HILITE_COLOR, roughness:0.4, metalness:0.05, emissive: HILITE_COLOR, emissiveIntensity: 1.3 })
+          : new THREE.MeshStandardMaterial({ color: 0x0e1f38, roughness:0.35, metalness:0.15, emissive: 0x0a1830, emissiveIntensity: 0.35, transparent:true, opacity: anchor?0.16:0.1, depthWrite:false });
         const mesh = new THREE.Mesh(geo, mat);
-        mesh.position.set(colX, y+h/2, pz);
+        if(anchor) mesh.position.set(anchor.x, anchor.y, anchor.z);
+        else mesh.position.set(colX, y+h/2, pz);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         mesh.userData = {type:'apt', ref:apt};
@@ -1287,10 +1296,11 @@ function buildScene(){
 
         // franja de color por piso (mantiene el codigo visual PB/1/2/3/PH sobre la fachada realista)
         if(!isSel){
-          const capGeo = new THREE.BoxGeometry(CELL_W*0.94, FLOOR_H*0.09, CELL_D*0.94);
+          const capGeo = new THREE.BoxGeometry(w*1.02, FLOOR_H*0.09, d*1.02);
           const capMat = new THREE.MeshStandardMaterial({color: pisoColor(apt.piso), roughness:0.5, metalness:0.05});
           const cap = new THREE.Mesh(capGeo, capMat);
-          cap.position.set(colX, y+h+FLOOR_H*0.045, pz);
+          if(anchor) cap.position.set(anchor.x, anchor.y+h/2+FLOOR_H*0.045, anchor.z);
+          else cap.position.set(colX, y+h+FLOOR_H*0.045, pz);
           cap.castShadow = true;
           objectsGroup.add(cap);
         }
@@ -1299,27 +1309,6 @@ function buildScene(){
       left.forEach((numero,i)=> placeApt(numero, CORE_OFFSET, i));
       right.forEach((numero,i)=> placeApt(numero, -CORE_OFFSET, i));
 
-      // pasillo con plantas: marcadores decorativos en el eje central del corredor
-      for(let i=0;i<rows;i++){
-        const pz = zSign*((i+0.5)*(CELL_D+GAP));
-        const potGeo = new THREE.CylinderGeometry(0.14,0.18,0.32,8);
-        const potMat = new THREE.MeshStandardMaterial({color:0x14532d, roughness:0.8});
-        const pot = new THREE.Mesh(potGeo, potMat);
-        pot.position.set(0, y+0.16, pz);
-        objectsGroup.add(pot);
-        const leafGeo = new THREE.ConeGeometry(0.22,0.5,8);
-        const leafMat = new THREE.MeshStandardMaterial({color:0x22c55e, roughness:0.7});
-        const leaf = new THREE.Mesh(leafGeo, leafMat);
-        leaf.position.set(0, y+0.16+0.4, pz);
-        objectsGroup.add(leaf);
-      }
-
-      // etiqueta "Entrada Principal" en el extremo lejano de Torre A, solo en PB
-      if(torre==='A' && piso==='PB'){
-        const entLabel = makeTextSprite('ENTRADA PRINCIPAL', {fontSize:30, color:'#fbbf24'});
-        entLabel.position.set(0, y+2.2, zSign*(totalD+1.2));
-        objectsGroup.add(entLabel);
-      }
     });
   });
 
@@ -1328,26 +1317,6 @@ function buildScene(){
   const coreBottom = -(NUM_SOTANOS)*FLOOR_H;
   const coreH = coreTop - coreBottom;
   const coreMidY = (coreTop+coreBottom)/2;
-
-  const elevGeo = new THREE.BoxGeometry(1.6, coreH, 1.6);
-  const elevMat = new THREE.MeshStandardMaterial({color:0x475569, roughness:0.4, metalness:0.3});
-  const elevMesh = new THREE.Mesh(elevGeo, elevMat);
-  elevMesh.position.set(CORE_OFFSET, coreMidY, 0);
-  elevMesh.castShadow = true; elevMesh.receiveShadow = true;
-  objectsGroup.add(elevMesh);
-  const elevLabel = makeTextSprite('Ascensor', {fontSize:26, color:'#cbd5e1'});
-  elevLabel.position.set(CORE_OFFSET, coreTop+0.9, 0);
-  objectsGroup.add(elevLabel);
-
-  const stairGeo = new THREE.BoxGeometry(1.6, coreH, 1.6);
-  const stairMat = new THREE.MeshStandardMaterial({color:0x57534e, roughness:0.7});
-  const stairMesh = new THREE.Mesh(stairGeo, stairMat);
-  stairMesh.position.set(-CORE_OFFSET, coreMidY, 0);
-  stairMesh.castShadow = true; stairMesh.receiveShadow = true;
-  objectsGroup.add(stairMesh);
-  const stairLabel = makeTextSprite('Escaleras', {fontSize:26, color:'#cbd5e1'});
-  stairLabel.position.set(-CORE_OFFSET, coreTop+0.9, 0);
-  objectsGroup.add(stairLabel);
 
   // arco curvo sobre el nucleo, uniendo ascensor y escaleras (rasgo distintivo del edificio real en las fotos)
   (function(){
@@ -1370,96 +1339,9 @@ function buildScene(){
     }
   })();
 
-  // sótanos (mismo estilo visual que los pisos, apilados debajo de PB, siempre visibles)
-  const matchedParkNums = new Set();
-  const matchedMaletNums = new Set();
-  if(selected && selected.type==='apt'){
-    selected.ref.componentes.forEach(c=>{
-      const n = extractDigits(c.label);
-      if(n===null) return;
-      if(c.tipo==='Estacionamiento') matchedParkNums.add(n);
-      if(c.tipo==='Maletero') matchedMaletNums.add(n);
-    });
-  }
-
-  SOTANOS.forEach((sKey, si)=>{
-    const y = -(si+1)*FLOOR_H;
-    const puestosSot = parking.filter(p=>String(p.sotano)===sKey).sort((a,b)=>a.numero-b.numero);
-    const maletSot = maleteros.filter(m=>String(m.sotano)===sKey).sort((a,b)=>a.numero-b.numero);
-    const cols = 8;
-    const cw = 1.9, cd = 1.5, gap=0.3;
-    const rowsPuestos = Math.max(1, Math.ceil(puestosSot.length/cols));
-    const rowsMalet = Math.max(1, Math.ceil(maletSot.length/cols));
-    const totalW = cols*(cw+gap)-gap;
-    const totalD = (rowsPuestos+rowsMalet)*(cd+gap)-gap + 1.0; // fila extra de separacion visual
-
-    const slabGeo = new THREE.BoxGeometry(totalW+1.6, 0.18, totalD+1.6);
-    const slabMat = new THREE.MeshStandardMaterial({color:0x1c2735, roughness:0.9, transparent:true, opacity:0.85});
-    const slab = new THREE.Mesh(slabGeo, slabMat);
-    slab.position.set(0, y-0.15, 0);
-    slab.receiveShadow = true;
-    objectsGroup.add(slab);
-
-    // muro perimetral con reja de ladrillo calado, como en el nivel de sotano de las fotos reales
-    (function(){
-      const wallH = 1.4;
-      const wallY = y - 0.06 + wallH/2;
-      const wallMat = new THREE.MeshStandardMaterial({map: CALADO_TEX, color:0xffffff, roughness:0.85});
-      const wallThick = 0.12;
-      const wallFront = new THREE.Mesh(new THREE.BoxGeometry(totalW+1.6, wallH, wallThick), wallMat);
-      wallFront.position.set(0, wallY, (totalD+1.6)/2);
-      wallFront.receiveShadow = true; wallFront.castShadow = true;
-      objectsGroup.add(wallFront);
-      const wallBack = wallFront.clone();
-      wallBack.position.set(0, wallY, -(totalD+1.6)/2);
-      objectsGroup.add(wallBack);
-      const wallLeft = new THREE.Mesh(new THREE.BoxGeometry(wallThick, wallH, totalD+1.6), wallMat);
-      wallLeft.position.set(-(totalW+1.6)/2, wallY, 0);
-      wallLeft.receiveShadow = true; wallLeft.castShadow = true;
-      objectsGroup.add(wallLeft);
-      const wallRight = wallLeft.clone();
-      wallRight.position.set((totalW+1.6)/2, wallY, 0);
-      objectsGroup.add(wallRight);
-    })();
-
-    const lbl = makeTextSprite('Sótano '+sKey, {fontSize:30, color:'#8c8579'});
-    lbl.position.set(-totalW/2-1.8, y+0.5, 0);
-    objectsGroup.add(lbl);
-    floorLabelSprites.push({sprite:lbl, piso:'SOTANO'+sKey});
-
-    const hiddenSot = filterSotano!==null && filterSotano!==sKey;
-
-    function placeRow(list, kind, rowOffset){
-      list.forEach((item, idx)=>{
-        const col = idx % cols;
-        const row = Math.floor(idx/cols);
-        const px = -totalW/2 + col*(cw+gap) + cw/2;
-        const pz = -totalD/2 + (rowOffset+row)*(cd+gap) + cd/2;
-        const num = item.numero;
-        const directSel = selected && ((kind==='park'&&selected.type==='park'&&String(selected.ref.numero)===String(item.numero)) || (kind==='malet'&&selected.type==='malet'&&String(selected.ref.numero)===String(item.numero)));
-        const relatedSel = selected && selected.type==='apt' && ((kind==='park'&&matchedParkNums.has(num)) || (kind==='malet'&&matchedMaletNums.has(num)));
-        const isSel = directSel || relatedSel;
-        if(hiddenSot && !isSel) return; // desaparece por completo si no coincide con el filtro
-        const h = kind==='park' ? 0.35 : 0.9;
-        const geo = new THREE.BoxGeometry(cw*0.85, h, cd*0.85);
-        const mat = new THREE.MeshStandardMaterial({
-          color: isSel ? HILITE_COLOR : (kind==='park' ? 0x9a958a : 0x8a5a2b),
-          roughness:0.6,
-          emissive: isSel ? HILITE_COLOR : 0x000000,
-          emissiveIntensity: isSel ? 1.1 : 0
-        });
-        const mesh = new THREE.Mesh(geo, mat);
-        mesh.position.set(px, y+h/2, pz);
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        mesh.userData = {type:kind, ref:item, sotano: sKey};
-        objectsGroup.add(mesh);
-        raycastTargets.push(mesh);
-      });
-    }
-    placeRow(puestosSot, 'park', 0);
-    placeRow(maletSot, 'malet', rowsPuestos + 0.7);
-  });
+  // los sotanos (puestos de estacionamiento / maleteros) ya no se dibujan en el 3D:
+  // solo queda la imagen del edificio real. Los datos siguen intactos y visibles
+  // en el panel de cada apartamento (pestaña de detalle / componentes).
 
   updateSpriteVisibility();
 }
@@ -1568,6 +1450,15 @@ function handleClick(e){
   if(hits.length){
     const d = hits[0].object.userData;
     if(d.type==='apt'){
+      if(selected && selected.type==='apt' && selected.ref.id===d.ref.id){
+        // segundo clic sobre el mismo apartamento: apaga la luz y deselecciona
+        selected = null;
+        document.getElementById('fichaModal').classList.remove('open','minimized','maximized');
+        fichaEditMode = false;
+        if(currentTab==='editar'){ currentTab='lista'; renderSidebar(); }
+        buildScene();
+        return;
+      }
       openFichaApt(d.ref);
       return;
     }
@@ -1667,10 +1558,8 @@ function focusFloor(piso){
   updateCamera(); rebuildScene(); renderTopbar();
 }
 function focusSotano(s){
-  if(s===null){ focusAll(); return; }
-  const y = -parseInt(s,10)*FLOOR_H;
-  camTarget.set(0, y+1, 0); camRadius=22; camPhi=1.0;
-  updateCamera(); rebuildScene(); renderTopbar();
+  // los sotanos ya no tienen representacion 3D propia; la camara se queda en la vista general del edificio
+  focusAll();
 }
 
 // ---------- sidebar rendering ----------
