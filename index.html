@@ -2295,6 +2295,7 @@ function multaCardHtml(m){
     +'<div class="savebar" style="margin-top:8px;">'
     +(m.estado!=='pagada' ? '<button class="btn ghost" data-marcar-pagada="'+esc(m.id)+'" style="flex:1;">✓ Marcar pagada</button>' : '')
     +'<button class="btn ghost" data-reenviar="'+esc(m.id)+'" style="flex:1;">📲 Reenviar WhatsApp</button>'
+    +'<button class="btn ghost" data-eliminar="'+esc(m.id)+'" style="flex:0 0 auto;color:#c1503f;" title="Eliminar multa">🗑️</button>'
     +'</div>'
   +'</div>';
 }
@@ -2380,6 +2381,16 @@ function renderMultasTab(body){
       if(apt) sendWhatsAppToApt(apt, ()=>buildMultaMsg(m));
       return;
     }
+    const eliminarBtn = e.target.closest('[data-eliminar]');
+    if(eliminarBtn){
+      const id = eliminarBtn.dataset.eliminar;
+      if(confirm('¿Eliminar esta multa? Esta acción no se puede deshacer.')){
+        multas = multas.filter(x=>x.id!==id);
+        await saveMultas();
+        renderSidebar();
+      }
+      return;
+    }
   });
 
   document.getElementById('btnNuevaMulta').onclick = async ()=>{
@@ -2399,7 +2410,7 @@ function renderMultasTab(body){
       articulos_label: articulo,
       descripcion,
       monto,
-      fecha: fecha ? new Date(fecha).toISOString() : new Date().toISOString(),
+      fecha: fecha ? new Date(fecha+'T12:00:00').toISOString() : new Date().toISOString(),
       estado: 'pendiente',
       fecha_pago: null,
       creado: new Date().toISOString()
@@ -2409,12 +2420,7 @@ function renderMultasTab(body){
     const tieneTel = apt && getContactOptions(apt).length>0;
     if(tieneTel) sendWhatsAppToApt(apt, ()=>buildMultaMsg(m));
     flag.textContent = tieneTel ? '✓ Multa registrada, abriendo WhatsApp...' : '✓ Multa registrada (sin teléfono para avisar; agrégalo en Editar)';
-    document.getElementById('mu_articulo').value='';
-    document.getElementById('mu_descripcion').value='';
-    document.getElementById('mu_monto').value='';
-    document.getElementById('mu_buscar_falta').value='';
-    document.getElementById('mu_faltaListHost').innerHTML='';
-    renderMultasList(document.getElementById('mu_buscar_lista').value);
+    renderSidebar();
   };
 }
 
